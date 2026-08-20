@@ -29,8 +29,8 @@ pipeline {
 
         stage('Docker Deploy') {
             steps {
-                bat 'docker compose down'
-                bat 'docker compose up --build -d'
+                bat 'C:\User\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker'
+                bat 'C:\User\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker.exe'
             }
         }
 
@@ -52,7 +52,7 @@ pipeline {
 
     post {
         always {
-            bat 'docker compose ps'
+            bat 'C:\User\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker'
         }
 
         success {
