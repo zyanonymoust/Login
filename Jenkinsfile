@@ -33,8 +33,8 @@ pipeline {
 
         stage('Docker Deploy') {
             steps {
-                bat '"%COMPOSE_EXE%" down'
-                bat '"%COMPOSE_EXE%" up --build -d'
+                bat '"%COMPOSE_EXE%" -p login-app down --remove-orphans'
+                bat '"%COMPOSE_EXE%" -p login-app up --build -d'
             }
         }
 
@@ -56,7 +56,7 @@ pipeline {
 
     post {
         always {
-            bat returnStatus: true, script: '"%COMPOSE_EXE%" ps'
+            bat returnStatus: true, script: '"%COMPOSE_EXE%" -p login-app ps'
         }
 
         success {
@@ -68,5 +68,3 @@ pipeline {
         }
     }
 }
-
-
