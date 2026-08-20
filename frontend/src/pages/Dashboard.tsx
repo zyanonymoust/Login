@@ -8,6 +8,16 @@ interface CurrentUser {
     email?: string;
 }
 
+interface GlowParticle {
+    x: number;
+    y: number;
+    size: number;
+    speedX: number;
+    speedY: number;
+    color: string;
+    opacity: number;
+}
+
 type ReactionState =
     | "idle"
     | "waiting"
@@ -17,6 +27,10 @@ type ReactionState =
 
 function Dashboard() {
     const navigate = useNavigate();
+
+    const dashboardRef = useRef<HTMLDivElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const reactionTimer = useRef<number | null>(null);
 
     const [currentUser] = useState<CurrentUser>(() => {
         try {
@@ -41,10 +55,13 @@ function Dashboard() {
     );
 
     const [guess, setGuess] = useState("");
+
     const [guessMessage, setGuessMessage] = useState(
         "Enter a number from 1 to 100."
     );
+
     const [guessAttempts, setGuessAttempts] = useState(0);
+
     const [guessCompleted, setGuessCompleted] =
         useState(false);
 
@@ -52,12 +69,12 @@ function Dashboard() {
         useState<ReactionState>("idle");
 
     const [reactionStart, setReactionStart] = useState(0);
+
     const [reactionTime, setReactionTime] =
         useState<number | null>(null);
+
     const [bestReaction, setBestReaction] =
         useState<number | null>(null);
-
-    const reactionTimer = useRef<number | null>(null);
 
     useEffect(() => {
         const timer = window.setInterval(() => {
@@ -75,9 +92,280 @@ function Dashboard() {
     }, [darkMode]);
 
     useEffect(() => {
+        const canvas = canvasRef.current;
+        const dashboard = dashboardRef.current;
+
+        if (!canvas || !dashboard) {
+            return;
+        }
+
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+            return;
+        }
+
+        const colours = [
+            "#00ffd5",
+            "#00c8ff",
+            "#8b5cff",
+            "#ff00d4",
+            "#ffffff"
+        ];
+
+        const mouse = {
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2,
+            active: false
+        };
+
+        let particles: GlowParticle[] = [];
+        let animationId = 0;
+
+        function createParticles() {
+            const amount = Math.min(
+                180,
+                Math.max(
+                    80,
+                    Math.floor(
+                        (window.innerWidth *
+                            window.innerHeight) /
+                        9000
+                    )
+                )
+            );
+
+            particles = Array.from(
+                { length: amount },
+                () => ({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    size: Math.random() * 2.2 + 0.5,
+                    speedX: (Math.random() - 0.5) * 0.4,
+                    speedY: (Math.random() - 0.5) * 0.4,
+                    color:
+                        colours[
+                        Math.floor(
+                            Math.random() *
+                            colours.length
+                        )
+                        ],
+                    opacity: Math.random() * 0.38 + 0.1
+                })
+            );
+        }
+
+        function resizeCanvas() {
+            const pixelRatio = Math.min(
+                window.devicePixelRatio || 1,
+                2
+            );
+
+            canvas.width =
+                window.innerWidth * pixelRatio;
+
+            canvas.height =
+                window.innerHeight * pixelRatio;
+
+            canvas.style.width = `${window.innerWidth}px`;
+            canvas.style.height = `${window.innerHeight}px`;
+
+            context.setTransform(
+                pixelRatio,
+                0,
+                0,
+                pixelRatio,
+                0,
+                0
+            );
+
+            createParticles();
+        }
+
+        function handlePointerMove(event: PointerEvent) {
+            mouse.x = event.clientX;
+            mouse.y = event.clientY;
+            mouse.active = true;
+
+            dashboard.style.setProperty(
+                "--mouse-x",
+                `${event.clientX}px`
+            );
+
+            dashboard.style.setProperty(
+                "--mouse-y",
+                `${event.clientY}px`
+            );
+        }
+
+        function handlePointerLeave() {
+            mouse.active = false;
+        }
+
+        function animate() {
+            context.clearRect(
+                0,
+                0,
+                window.innerWidth,
+                window.innerHeight
+            );
+
+            particles.forEach((particle) => {
+                particle.x += particle.speedX;
+                particle.y += particle.speedY;
+
+                if (particle.x < -10) {
+                    particle.x = window.innerWidth + 10;
+                }
+
+                if (
+                    particle.x >
+                    window.innerWidth + 10
+                ) {
+                    particle.x = -10;
+                }
+
+                if (particle.y < -10) {
+                    particle.y =
+                        window.innerHeight + 10;
+                }
+
+                if (
+                    particle.y >
+                    window.innerHeight + 10
+                ) {
+                    particle.y = -10;
+                }
+
+                const distanceX =
+                    mouse.x - particle.x;
+
+                const distanceY =
+                    mouse.y - particle.y;
+
+                const distance = Math.sqrt(
+                    distanceX * distanceX +
+                    distanceY * distanceY
+                );
+
+                const lightRadius = 270;
+
+                const lightStrength =
+                    mouse.active &&
+                        distance < lightRadius
+                        ? 1 - distance / lightRadius
+                        : 0;
+
+                const particleSize =
+                    particle.size +
+                    lightStrength * 4.5;
+
+                const particleOpacity = Math.min(
+                    1,
+                    particle.opacity +
+                    lightStrength * 0.9
+                );
+
+                context.beginPath();
+
+                context.arc(
+                    particle.x,
+                    particle.y,
+                    particleSize,
+                    0,
+                    Math.PI * 2
+                );
+
+                context.fillStyle = particle.color;
+                context.globalAlpha = particleOpacity;
+
+                if (lightStrength > 0) {
+                    context.shadowBlur =
+                        8 + lightStrength * 28;
+
+                    context.shadowColor =
+                        particle.color;
+                } else {
+                    context.shadowBlur = 0;
+                }
+
+                context.fill();
+
+                if (
+                    lightStrength > 0.4 &&
+                    distance < 120
+                ) {
+                    context.beginPath();
+
+                    context.moveTo(
+                        particle.x,
+                        particle.y
+                    );
+
+                    context.lineTo(mouse.x, mouse.y);
+
+                    context.strokeStyle =
+                        particle.color;
+
+                    context.globalAlpha =
+                        lightStrength * 0.1;
+
+                    context.lineWidth = 0.7;
+                    context.stroke();
+                }
+            });
+
+            context.globalAlpha = 1;
+            context.shadowBlur = 0;
+
+            animationId =
+                window.requestAnimationFrame(animate);
+        }
+
+        resizeCanvas();
+        animate();
+
+        window.addEventListener(
+            "resize",
+            resizeCanvas
+        );
+
+        window.addEventListener(
+            "pointermove",
+            handlePointerMove
+        );
+
+        document.addEventListener(
+            "pointerleave",
+            handlePointerLeave
+        );
+
+        return () => {
+            window.cancelAnimationFrame(animationId);
+
+            window.removeEventListener(
+                "resize",
+                resizeCanvas
+            );
+
+            window.removeEventListener(
+                "pointermove",
+                handlePointerMove
+            );
+
+            document.removeEventListener(
+                "pointerleave",
+                handlePointerLeave
+            );
+        };
+    }, []);
+
+    useEffect(() => {
         return () => {
             if (reactionTimer.current !== null) {
-                window.clearTimeout(reactionTimer.current);
+                window.clearTimeout(
+                    reactionTimer.current
+                );
             }
         };
     }, []);
@@ -85,7 +373,10 @@ function Dashboard() {
     function logout() {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
-        navigate("/login", { replace: true });
+
+        navigate("/login", {
+            replace: true
+        });
     }
 
     function handleGuess() {
@@ -99,20 +390,27 @@ function Dashboard() {
             setGuessMessage(
                 "Please enter a number from 1 to 100."
             );
+
             return;
         }
 
         const nextAttempts = guessAttempts + 1;
+
         setGuessAttempts(nextAttempts);
 
         if (number < secretNumber) {
-            setGuessMessage("Too low. Try a higher number.");
+            setGuessMessage(
+                "Too low. Try a higher number."
+            );
         } else if (number > secretNumber) {
-            setGuessMessage("Too high. Try a lower number.");
+            setGuessMessage(
+                "Too high. Try a lower number."
+            );
         } else {
             setGuessMessage(
                 `Correct! You found ${secretNumber} in ${nextAttempts} attempts.`
             );
+
             setGuessCompleted(true);
         }
 
@@ -123,9 +421,11 @@ function Dashboard() {
         setSecretNumber(
             Math.floor(Math.random() * 100) + 1
         );
+
         setGuess("");
         setGuessAttempts(0);
         setGuessCompleted(false);
+
         setGuessMessage(
             "A new number has been generated."
         );
@@ -133,7 +433,9 @@ function Dashboard() {
 
     function startReactionGame() {
         if (reactionTimer.current !== null) {
-            window.clearTimeout(reactionTimer.current);
+            window.clearTimeout(
+                reactionTimer.current
+            );
         }
 
         setReactionState("waiting");
@@ -142,16 +444,19 @@ function Dashboard() {
         const delay =
             Math.floor(Math.random() * 3000) + 2000;
 
-        reactionTimer.current = window.setTimeout(() => {
-            setReactionStart(Date.now());
-            setReactionState("ready");
-        }, delay);
+        reactionTimer.current =
+            window.setTimeout(() => {
+                setReactionStart(Date.now());
+                setReactionState("ready");
+            }, delay);
     }
 
     function handleReactionClick() {
         if (reactionState === "waiting") {
             if (reactionTimer.current !== null) {
-                window.clearTimeout(reactionTimer.current);
+                window.clearTimeout(
+                    reactionTimer.current
+                );
             }
 
             setReactionState("early");
@@ -159,7 +464,8 @@ function Dashboard() {
         }
 
         if (reactionState === "ready") {
-            const result = Date.now() - reactionStart;
+            const result =
+                Date.now() - reactionStart;
 
             setReactionTime(result);
             setReactionState("finished");
@@ -199,16 +505,33 @@ function Dashboard() {
 
     return (
         <div
+            ref={dashboardRef}
             className={
                 darkMode
                     ? "dashboard-page dark"
                     : "dashboard-page"
             }
         >
+            <canvas
+                ref={canvasRef}
+                className="particle-canvas"
+            />
+
+            <div className="mouse-light" />
+            <div className="background-vignette" />
+
             <header className="dashboard-header">
                 <div className="brand">
+                    <div className="brand-icon">
+                        {(currentUser.name || "U")
+                            .charAt(0)
+                            .toUpperCase()}
+                    </div>
 
-                    <div></div>
+                    <div>
+                        <strong>Login Dashboard</strong>
+                        <span>Secure user area</span>
+                    </div>
                 </div>
 
                 <div className="header-actions">
@@ -220,7 +543,9 @@ function Dashboard() {
                             )
                         }
                     >
-                        {darkMode ? "☀️ Light" : "🌙 Dark"}
+                        {darkMode
+                            ? "☀️ Light"
+                            : "🌙 Dark"}
                     </button>
 
                     <button
@@ -245,13 +570,14 @@ function Dashboard() {
                         </h1>
 
                         <p>
-                            Your account is active and securely
-                            authenticated.
+                            Your account is active and
+                            securely authenticated.
                         </p>
 
                         <div className="user-details">
                             <div>
                                 <span>Email</span>
+
                                 <strong>
                                     {currentUser.email ||
                                         "Not available"}
@@ -260,8 +586,10 @@ function Dashboard() {
 
                             <div>
                                 <span>User ID</span>
+
                                 <strong>
-                                    {currentUser.userId || "—"}
+                                    {currentUser.userId ||
+                                        "—"}
                                 </strong>
                             </div>
                         </div>
@@ -300,6 +628,7 @@ function Dashboard() {
 
                         <div>
                             <span>Today</span>
+
                             <strong>
                                 {currentTime.toLocaleDateString(
                                     undefined,
@@ -320,6 +649,7 @@ function Dashboard() {
 
                         <div>
                             <span>Local Time</span>
+
                             <strong>
                                 {currentTime.toLocaleTimeString(
                                     [],
@@ -348,11 +678,18 @@ function Dashboard() {
                 <section className="game-grid">
                     <article className="game-card">
                         <div className="game-heading">
-                            <div className="game-icon">🎯</div>
+                            <div className="game-icon">
+                                🎯
+                            </div>
 
                             <div>
-                                <h3>Guess the Number</h3>
-                                <p>Find the hidden number.</p>
+                                <h3>
+                                    Guess the Number
+                                </h3>
+
+                                <p>
+                                    Find the hidden number.
+                                </p>
                             </div>
                         </div>
 
@@ -368,7 +705,9 @@ function Dashboard() {
                                 min="1"
                                 max="100"
                                 value={guess}
-                                disabled={guessCompleted}
+                                disabled={
+                                    guessCompleted
+                                }
                                 placeholder="Your guess"
                                 onChange={(event) =>
                                     setGuess(
@@ -377,7 +716,8 @@ function Dashboard() {
                                 }
                                 onKeyDown={(event) => {
                                     if (
-                                        event.key === "Enter" &&
+                                        event.key ===
+                                        "Enter" &&
                                         !guessCompleted
                                     ) {
                                         handleGuess();
@@ -406,25 +746,36 @@ function Dashboard() {
                             }
                         >
                             <p>{guessMessage}</p>
+
                             <span>
-                                Attempts: {guessAttempts}
+                                Attempts:{" "}
+                                {guessAttempts}
                             </span>
                         </div>
                     </article>
 
                     <article className="game-card">
                         <div className="game-heading">
-                            <div className="game-icon">⚡</div>
+                            <div className="game-icon">
+                                ⚡
+                            </div>
 
                             <div>
-                                <h3>Reaction Speed</h3>
-                                <p>Click when the colour changes.</p>
+                                <h3>
+                                    Reaction Speed
+                                </h3>
+
+                                <p>
+                                    Click when the colour
+                                    changes.
+                                </p>
                             </div>
                         </div>
 
                         <div className="reaction-score">
                             <div>
                                 <span>Latest</span>
+
                                 <strong>
                                     {reactionTime === null
                                         ? "—"
@@ -434,6 +785,7 @@ function Dashboard() {
 
                             <div>
                                 <span>Best</span>
+
                                 <strong>
                                     {bestReaction === null
                                         ? "—"
@@ -445,25 +797,32 @@ function Dashboard() {
                         {reactionState === "idle" && (
                             <button
                                 className="reaction-start"
-                                onClick={startReactionGame}
+                                onClick={
+                                    startReactionGame
+                                }
                             >
                                 Start Reaction Test
                             </button>
                         )}
 
-                        {reactionState === "waiting" && (
-                            <button
-                                className="reaction-zone waiting"
-                                onClick={handleReactionClick}
-                            >
-                                Wait for green...
-                            </button>
-                        )}
+                        {reactionState ===
+                            "waiting" && (
+                                <button
+                                    className="reaction-zone waiting"
+                                    onClick={
+                                        handleReactionClick
+                                    }
+                                >
+                                    Wait for green...
+                                </button>
+                            )}
 
                         {reactionState === "ready" && (
                             <button
                                 className="reaction-zone ready"
-                                onClick={handleReactionClick}
+                                onClick={
+                                    handleReactionClick
+                                }
                             >
                                 CLICK NOW!
                             </button>
@@ -472,32 +831,42 @@ function Dashboard() {
                         {reactionState === "early" && (
                             <div className="reaction-result early">
                                 <strong>Too early!</strong>
+
                                 <span>
-                                    Wait until the area turns green.
+                                    Wait until the area
+                                    turns green.
                                 </span>
 
                                 <button
-                                    onClick={startReactionGame}
+                                    onClick={
+                                        startReactionGame
+                                    }
                                 >
                                     Try Again
                                 </button>
                             </div>
                         )}
 
-                        {reactionState === "finished" && (
-                            <div className="reaction-result finished">
-                                <strong>
-                                    {reactionTime} ms
-                                </strong>
-                                <span>{getReactionRating()}</span>
+                        {reactionState ===
+                            "finished" && (
+                                <div className="reaction-result finished">
+                                    <strong>
+                                        {reactionTime} ms
+                                    </strong>
 
-                                <button
-                                    onClick={startReactionGame}
-                                >
-                                    Play Again
-                                </button>
-                            </div>
-                        )}
+                                    <span>
+                                        {getReactionRating()}
+                                    </span>
+
+                                    <button
+                                        onClick={
+                                            startReactionGame
+                                        }
+                                    >
+                                        Play Again
+                                    </button>
+                                </div>
+                            )}
                     </article>
                 </section>
             </main>

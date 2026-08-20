@@ -1,0 +1,30 @@
+.mouse-glow-background {
+    --mouse-x: 50vw;
+    --mouse-y: 50vh;
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    background: radial-gradient( circle at 50% 30%, #071c2d 0%, #020813 35%, #000207 75%, #000000 100% );
+}
+
+    .mouse-glow-background canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+.mouse-light {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient( circle 260px at var(--mouse-x) var(--mouse-y), rgba(0, 255, 213, 0.14) 0%, rgba(0, 191, 255, 0.08) 32%, rgba(139, 92, 255, 0.04) 55%, transparent 75% );
+    transition: background 0.04s linear;
+}
+
+.background-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient( circle at center, transparent 35%, rgba(0, 0, 0, 0.72) 100% );
+}
