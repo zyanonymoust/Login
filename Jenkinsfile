@@ -29,8 +29,8 @@ pipeline {
 
         stage('Docker Deploy') {
             steps {
-                bat 'C:\User\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker'
-                bat 'C:\User\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker.exe'
+                bat 'C:\Users\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker'
+                bat 'C:\Users\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker.exe'
             }
         }
 
@@ -52,7 +52,7 @@ pipeline {
 
     post {
         always {
-            bat 'C:\User\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker'
+            bat 'C:\Users\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker'
         }
 
         success {
