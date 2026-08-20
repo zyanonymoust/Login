@@ -1,0 +1,8 @@
+**/bin
+**/obj
+**/node_modoules
+**/dist
+**/.vs
+**/test-results
+**/playwright-report
+.git

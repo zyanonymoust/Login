@@ -1,0 +1,28 @@
+@host = http://localhost:5436
+
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "test@example.com",
+  "password": "123456",
+  "confirmPassword": "123456"
+}
+
+###
+
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "123456"
+}
+
+###
+
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjEiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiVGVzdCBVc2VyIiwiaHR0cDovL3NjaGVtYXMueG1sc29hcC5vcmcvd3MvMjAwNS8wNS9pZGVudGl0eS9jbGFpbXMvZW1haWxhZGRyZXNzIjoidGVzdEBleGFtcGxlLmNvbSIsImp0aSI6IjhjMWFkNzQyLWNiNTMtNDljOS04ZmVkLTBmZjYwMDE0N2M3MyIsImV4cCI6MTc4NzA0NjcxMiwiaXNzIjoiTG9naW4uU2VydmVyIiwiYXVkIjoiTG9naW4uRnJvbnRlbmQifQ.LVNIkOXXPOSuVbsXMqkWQMpXUZeqnfkWVGkDCKkz51A
+
+GET {{host}}/api/auth/me
+Authorization: Bearer {{token}}

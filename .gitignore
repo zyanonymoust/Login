@@ -1,0 +1,11 @@
+.vs/
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/test-results/
+**/playwright-report/
+*.user
+*.suo
+.env.local
+.env.*.local

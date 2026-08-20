@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:18.3
+    container_name: login-postgres
+    environment:
+      POSTGRES_DB: logindb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: LoginDb1234
+    ports:
+      - "5437:5432"
+    volumes:
+      - login-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres -d logindb
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    image: login-server
+    container_name: login-server
+    build:
+      context: .
+      dockerfile: Login.Server/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__logindb: Host=postgres;Port=5432;Database=logindb;Username=postgres;Password=LoginDb1234
+      Jwt__Issuer: Login.Server
+      Jwt__Audience: Login.Frontend
+      Jwt__Key: docker-development-secret-key-at-least-32-characters
+      Jwt__ExpirationMinutes: 120
+    ports:
+      - "8083:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    image: login-frontend
+    container_name: login-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8083
+    ports:
+      - "3002:80"
+    depends_on:
+      - server
+
+volumes:
+  login-postgres-data:
