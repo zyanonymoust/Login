@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_EXE = 'C:/Users/Hp/AppData/Local/Programs/DockerDesktop/resources/bin/docker.exe'
+        COMPOSE_EXE = 'C:/Users/Hp/AppData/Local/Programs/DockerDesktop/resources/bin/docker-compose.exe'
     }
 
     options {
@@ -33,8 +33,8 @@ pipeline {
 
         stage('Docker Deploy') {
             steps {
-                bat '"%DOCKER_EXE%" compose down'
-                bat '"%DOCKER_EXE%" compose up --build -d'
+                bat '"%COMPOSE_EXE%" down'
+                bat '"%COMPOSE_EXE%" up --build -d'
             }
         }
 
@@ -56,7 +56,7 @@ pipeline {
 
     post {
         always {
-            bat returnStatus: true, script: '"%DOCKER_EXE%" compose ps'
+            bat returnStatus: true, script: '"%COMPOSE_EXE%" ps'
         }
 
         success {
