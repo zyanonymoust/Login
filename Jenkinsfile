@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_EXE = 'C:/Program Files/Docker/Docker/resources/bin/docker.exe'
+        DOCKER_EXE = 'C:/Users/Hp/AppData/Local/Programs/DockerDesktop/resources/bin/docker.exe'
     }
 
     options {
