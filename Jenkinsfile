@@ -1,88 +1,66 @@
 pipeline {
-	agent any
+    agent any
 
-	stage{
-		stage('Checkout'){
-			steps {
-				Checkout scm
-			}
-		}
+    options {
+        disableConcurrentBuilds()
+    }
 
-		stage('Backend Test'){
-			steps {
-				bat '''
-					dotnet test .\\Login.Server.Tests.csproj -c Release
-				'''
-			}
-		}
-	}
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
 
-	stage('Frontend Build'){
-		steps {
-			dir('frontend'){
-				bat '''
-					call npm.cmd ci
-					call npm.cmd run build
-				'''
-			}
-		}
-	}
+        stage('Backend Test') {
+            steps {
+                bat 'dotnet test .\\Login.Server.Tests\\Login.Server.Tests.csproj -c Release'
+            }
+        }
 
-	stage('Docker Deploy'){
-		steps {
-		bat '''
-			docker compose down
-			docker compose up --build -d
-		'''
-		}
-	}
+        stage('Frontend Build') {
+            steps {
+                dir('frontend') {
+                    bat 'npm.cmd ci'
+                    bat 'npm.cmd run build'
+                }
+            }
+        }
 
-	stage('Wait For Frontend'){
-		steps {
-		 bats '''
-			@echo off
+        stage('Docker Deploy') {
+            steps {
+                bat 'docker compose down'
+                bat 'docker compose up --build -d'
+            }
+        }
 
-			for /L %%i in (1,1,30) do (
-				curl.exe -f http://localhost:3002 >nul  2>&1
+        stage('Wait For Frontend') {
+            steps {
+                bat 'powershell.exe -NoProfile -Command "for ($i = 0; $i -lt 30; $i++) { try { Invoke-WebRequest -UseBasicParsing http://localhost:3002 | Out-Null; exit 0 } catch { Start-Sleep -Seconds 2 } }; exit 1"'
+            }
+        }
 
-				if not errorlevel 1 (
-					exit /b 0
-				)
+        stage('E2E Test') {
+            steps {
+                dir('frontend') {
+                    bat 'npx.cmd playwright install chromium'
+                    bat 'npx.cmd playwright test --project=chromium'
+                }
+            }
+        }
+    }
 
-				timeout /t 2 /nobreak >nul
-			)
+    post {
+        always {
+            bat 'docker compose ps'
+        }
 
-			exit /b 1
+        success {
+            echo "Login Pipeline completed successfully."
+        }
 
-		'''
-
-		}
-	}
-
-	stage('E2E Test'){
-		steps {
-			dir('frontend'){
-				bat '''
-					call npx.cmd playwright install chorium
-					call npx.cmd playwright test --project=chorium
-				'''
-			}
-		}
-	}
-}
-
-post {
-	always {
-		bat '''
-			docker compose ps
-		'''
-	}
-
-	success{
-		echo ''Login Pipeline completed successfully.'
-	}
-
-	failure {
-		echo 'Login Pipeline failed.'
-	}
+        failure {
+            echo "Login Pipeline failed."
+        }
+    }
 }
