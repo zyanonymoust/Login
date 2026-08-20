@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKER_EXE = 'C:/Program Files/Docker/Docker/resources/bin/docker.exe'
+    }
+
     options {
         disableConcurrentBuilds()
     }
@@ -29,8 +33,8 @@ pipeline {
 
         stage('Docker Deploy') {
             steps {
-                bat 'C:\Users\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker'
-                bat 'C:\Users\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker.exe'
+                bat '"%DOCKER_EXE%" compose down'
+                bat '"%DOCKER_EXE%" compose up --build -d'
             }
         }
 
@@ -52,17 +56,15 @@ pipeline {
 
     post {
         always {
-            bat 'C:\Users\Hp\AppData\Local\Programs\DockerDestop\resources\bin\docker'
+            bat returnStatus: true, script: '"%DOCKER_EXE%" compose ps'
         }
 
         success {
-            echo "Login Pipeline completed successfully."
+            echo 'Login Pipeline completed successfully.'
         }
 
         failure {
-            echo "Login Pipeline failed."
+            echo 'Login Pipeline failed.'
         }
     }
 }
-
-
