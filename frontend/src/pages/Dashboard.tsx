@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import JumpGame from "../components/JumpGame";
 import "./dashboard.css";
 
 interface CurrentUser {
@@ -611,10 +612,7 @@ function Dashboard() {
                     }
                 >
                     <span className="effects-status-dot" />
-
-                    {effectsEnabled
-                        ? "Meteor Tail"
-                        : "Meteor Tail"}
+                    Meteor Tail
                 </button>
 
                 <div className="header-actions">
@@ -756,7 +754,8 @@ function Dashboard() {
                     </div>
 
                     <p>
-                        Test your luck and reaction speed.
+                        Test your timing, luck and
+                        reaction speed.
                     </p>
                 </section>
 
@@ -790,9 +789,7 @@ function Dashboard() {
                                 min="1"
                                 max="100"
                                 value={guess}
-                                disabled={
-                                    guessCompleted
-                                }
+                                disabled={guessCompleted}
                                 placeholder="Your guess"
                                 onChange={(event) =>
                                     setGuess(
@@ -953,6 +950,8 @@ function Dashboard() {
                                 </div>
                             )}
                     </article>
+
+                    <JumpGame />
                 </section>
             </main>
         </div>

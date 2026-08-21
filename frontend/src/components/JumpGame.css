@@ -1,0 +1,464 @@
+.jump-game-card {
+    grid-column: 1 / -1;
+    padding: 24px;
+    overflow: hidden;
+    border: 1px solid rgba(111, 91, 211, 0.16);
+    border-radius: 24px;
+    background: linear-gradient( 145deg, rgba(255, 255, 255, 0.96), rgba(247, 245, 255, 0.92) );
+    box-shadow: 0 20px 45px rgba(55, 38, 120, 0.12);
+    transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.jump-game-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 20px;
+}
+
+.jump-game-title {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.jump-game-icon {
+    display: grid;
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    place-items: center;
+    border: 1px solid rgba(126, 97, 255, 0.22);
+    border-radius: 16px;
+    background: linear-gradient( 145deg, rgba(139, 105, 255, 0.17), rgba(94, 208, 255, 0.14) );
+    font-size: 25px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 20px rgba(96, 67, 190, 0.12);
+}
+
+.jump-game-title h3 {
+    margin: 0;
+    color: #242047;
+    font-size: 20px;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+}
+
+.jump-game-title p {
+    margin: 5px 0 0;
+    color: #7b7694;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.jump-game-scores {
+    display: flex;
+    flex-shrink: 0;
+    gap: 10px;
+}
+
+    .jump-game-scores > div {
+        display: flex;
+        min-width: 82px;
+        padding: 10px 14px;
+        flex-direction: column;
+        align-items: center;
+        border: 1px solid rgba(111, 91, 211, 0.13);
+        border-radius: 14px;
+        background: rgba(245, 242, 255, 0.78);
+    }
+
+    .jump-game-scores span {
+        color: #8b86a4;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .jump-game-scores strong {
+        margin-top: 2px;
+        color: #5942ca;
+        font-size: 21px;
+        line-height: 1.2;
+    }
+
+.jump-game-stage {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border: 1px solid rgba(126, 121, 255, 0.25);
+    border-radius: 20px;
+    background: #111b42;
+    box-shadow: inset 0 0 40px rgba(95, 69, 202, 0.2), 0 15px 32px rgba(31, 25, 91, 0.18);
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.jump-game-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 15 / 7;
+}
+
+.jump-game-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    padding: 30px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #ffffff;
+    background: radial-gradient( circle at center, rgba(83, 56, 168, 0.38), rgba(12, 17, 54, 0.68) );
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    animation: jump-overlay-appear 0.35s ease;
+}
+
+    .jump-game-overlay::before {
+        position: absolute;
+        width: 250px;
+        height: 250px;
+        border-radius: 50%;
+        background: radial-gradient( circle, rgba(118, 226, 255, 0.18), transparent 68% );
+        content: "";
+        pointer-events: none;
+    }
+
+    .jump-game-overlay > * {
+        position: relative;
+        z-index: 1;
+    }
+
+.jump-game-overlay-label {
+    display: inline-flex;
+    padding: 6px 12px;
+    align-items: center;
+    border: 1px solid rgba(142, 228, 255, 0.28);
+    border-radius: 999px;
+    color: #a9f3ff;
+    background: rgba(79, 194, 230, 0.12);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.jump-game-overlay h4 {
+    margin: 13px 0 7px;
+    color: #ffffff;
+    font-size: clamp(25px, 4vw, 40px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    text-shadow: 0 4px 22px rgba(111, 94, 255, 0.75);
+}
+
+.jump-game-overlay p {
+    max-width: 370px;
+    margin: 0;
+    color: rgba(236, 241, 255, 0.8);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.jump-game-overlay button {
+    min-width: 145px;
+    margin-top: 20px;
+    padding: 12px 24px;
+    border: 0;
+    border-radius: 13px;
+    color: #292054;
+    background: linear-gradient( 135deg, #aef5ff, #8ecfff );
+    box-shadow: 0 10px 28px rgba(77, 210, 255, 0.34);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+    .jump-game-overlay button:hover {
+        filter: brightness(1.08);
+        transform: translateY(-2px);
+        box-shadow: 0 14px 32px rgba(77, 210, 255, 0.45);
+    }
+
+    .jump-game-overlay button:active {
+        transform: translateY(0) scale(0.97);
+    }
+
+.jump-game-overlay.game-over {
+    background: radial-gradient( circle at center, rgba(99, 55, 166, 0.42), rgba(20, 13, 50, 0.76) );
+}
+
+    .jump-game-overlay.game-over
+    .jump-game-overlay-label {
+        border-color: rgba(255, 169, 212, 0.36);
+        color: #ffd2eb;
+        background: rgba(255, 103, 183, 0.14);
+    }
+
+.jump-game-help {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    padding: 7px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.17);
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.76);
+    background: rgba(14, 17, 55, 0.42);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+}
+
+.charge-container {
+    position: absolute;
+    right: 18px;
+    bottom: 17px;
+    width: min(235px, 32%);
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.17);
+    border-radius: 13px;
+    background: rgba(11, 16, 52, 0.58);
+    box-shadow: 0 10px 25px rgba(8, 11, 41, 0.25);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    pointer-events: none;
+}
+
+.charge-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 7px;
+}
+
+    .charge-label span {
+        color: rgba(235, 241, 255, 0.7);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .charge-label strong {
+        color: #c8f8ff;
+        font-size: 11px;
+    }
+
+.charge-track {
+    width: 100%;
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.charge-fill {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient( 90deg, #42e8db 0%, #62d7ff 45%, #9b72ff 72%, #ff6ec7 100% );
+    box-shadow: 0 0 14px rgba(94, 223, 255, 0.7);
+    transition: width 0.04s linear;
+}
+
+.jump-game-instructions {
+    display: flex;
+    margin-top: 16px;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    color: #817b9c;
+    font-size: 12px;
+    font-weight: 650;
+}
+
+    .jump-game-instructions span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+.dashboard-page.dark
+.jump-game-card {
+    border-color: rgba(139, 118, 255, 0.2);
+    background: linear-gradient( 145deg, rgba(30, 27, 62, 0.96), rgba(22, 21, 49, 0.95) );
+    box-shadow: 0 20px 48px rgba(6, 5, 22, 0.3);
+}
+
+.dashboard-page.dark
+.jump-game-title h3 {
+    color: #f4f1ff;
+}
+
+.dashboard-page.dark
+.jump-game-title p {
+    color: #aaa5c1;
+}
+
+.dashboard-page.dark
+.jump-game-icon {
+    border-color: rgba(146, 123, 255, 0.23);
+    background: linear-gradient( 145deg, rgba(130, 96, 255, 0.2), rgba(66, 189, 229, 0.13) );
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 20px rgba(0, 0, 0, 0.17);
+}
+
+.dashboard-page.dark
+.jump-game-scores > div {
+    border-color: rgba(142, 121, 255, 0.16);
+    background: rgba(48, 42, 86, 0.7);
+}
+
+.dashboard-page.dark
+.jump-game-scores span {
+    color: #9f99ba;
+}
+
+.dashboard-page.dark
+.jump-game-scores strong {
+    color: #b5a2ff;
+}
+
+.dashboard-page.dark
+.jump-game-instructions {
+    color: #9f99b8;
+}
+
+@keyframes jump-overlay-appear {
+    from {
+        opacity: 0;
+        transform: scale(1.025);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@media (max-width: 720px) {
+    .jump-game-card {
+        padding: 17px;
+        border-radius: 20px;
+    }
+
+    .jump-game-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .jump-game-scores {
+        width: 100%;
+    }
+
+        .jump-game-scores > div {
+            width: 50%;
+        }
+
+    .jump-game-stage {
+        border-radius: 15px;
+    }
+
+    .jump-game-help {
+        top: 9px;
+        left: 9px;
+        padding: 5px 8px;
+        font-size: 8px;
+    }
+
+    .charge-container {
+        right: 9px;
+        bottom: 9px;
+        width: 38%;
+        padding: 7px 8px;
+    }
+
+    .charge-label {
+        margin-bottom: 4px;
+    }
+
+        .charge-label span {
+            font-size: 7px;
+        }
+
+        .charge-label strong {
+            font-size: 8px;
+        }
+
+    .charge-track {
+        height: 5px;
+    }
+
+    .jump-game-overlay {
+        padding: 15px;
+    }
+
+    .jump-game-overlay-label {
+        padding: 4px 8px;
+        font-size: 8px;
+    }
+
+    .jump-game-overlay h4 {
+        margin: 7px 0 3px;
+        font-size: 22px;
+    }
+
+    .jump-game-overlay p {
+        display: none;
+    }
+
+    .jump-game-overlay button {
+        min-width: 115px;
+        margin-top: 10px;
+        padding: 9px 16px;
+        font-size: 12px;
+    }
+
+    .jump-game-instructions {
+        flex-wrap: wrap;
+        gap: 8px 15px;
+        font-size: 10px;
+    }
+}
+
+@media (max-width: 430px) {
+    .jump-game-title h3 {
+        font-size: 17px;
+    }
+
+    .jump-game-title p {
+        font-size: 12px;
+    }
+
+    .jump-game-icon {
+        width: 45px;
+        height: 45px;
+        border-radius: 13px;
+        font-size: 21px;
+    }
+
+    .jump-game-scores > div {
+        min-width: 0;
+        padding: 8px 10px;
+    }
+
+    .jump-game-scores strong {
+        font-size: 18px;
+    }
+
+    .jump-game-instructions {
+        justify-content: flex-start;
+    }
+}
