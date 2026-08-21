@@ -8,14 +8,15 @@ interface CurrentUser {
     email?: string;
 }
 
-interface GlowParticle {
+interface TrailParticle {
     x: number;
     y: number;
     size: number;
     speedX: number;
     speedY: number;
     color: string;
-    opacity: number;
+    createdAt: number;
+    lifetime: number;
 }
 
 type ReactionState =
@@ -28,7 +29,6 @@ type ReactionState =
 function Dashboard() {
     const navigate = useNavigate();
 
-    const dashboardRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const reactionTimer = useRef<number | null>(null);
 
@@ -45,6 +45,13 @@ function Dashboard() {
     const [darkMode, setDarkMode] = useState(() =>
         localStorage.getItem("dashboard-theme") === "dark"
     );
+
+    const [effectsEnabled, setEffectsEnabled] =
+        useState(() =>
+            localStorage.getItem(
+                "dashboard-effects"
+            ) !== "off"
+        );
 
     const [currentTime, setCurrentTime] = useState(
         new Date()
@@ -81,7 +88,9 @@ function Dashboard() {
             setCurrentTime(new Date());
         }, 1000);
 
-        return () => window.clearInterval(timer);
+        return () => {
+            window.clearInterval(timer);
+        };
     }, []);
 
     useEffect(() => {
@@ -92,13 +101,16 @@ function Dashboard() {
     }, [darkMode]);
 
     useEffect(() => {
-        const canvasElement = canvasRef.current;
-        const dashboardElement = dashboardRef.current;
+        localStorage.setItem(
+            "dashboard-effects",
+            effectsEnabled ? "on" : "off"
+        );
+    }, [effectsEnabled]);
 
-        if (
-            canvasElement === null ||
-            dashboardElement === null
-        ) {
+    useEffect(() => {
+        const canvasElement = canvasRef.current;
+
+        if (canvasElement === null) {
             return;
         }
 
@@ -112,64 +124,34 @@ function Dashboard() {
         const canvas: HTMLCanvasElement =
             canvasElement;
 
-        const dashboard: HTMLDivElement =
-            dashboardElement;
-
         const context: CanvasRenderingContext2D =
             contextValue;
 
+        context.clearRect(
+            0,
+            0,
+            window.innerWidth,
+            window.innerHeight
+        );
+
+        if (!effectsEnabled) {
+            return;
+        }
+
         const colours = [
             "#00ffd5",
-            "#00c8ff",
-            "#8b5cff",
-            "#ff00d4",
+            "#00d9ff",
+            "#00a8ff",
+            "#865cff",
+            "#d600ff",
             "#ffffff"
         ];
 
-        const mouse = {
-            x: window.innerWidth / 2,
-            y: window.innerHeight / 2,
-            active: false
-        };
-
-        let particles: GlowParticle[] = [];
+        let particles: TrailParticle[] = [];
         let animationId = 0;
 
-        function createParticles() {
-            const amount = Math.min(
-                180,
-                Math.max(
-                    80,
-                    Math.floor(
-                        (window.innerWidth *
-                            window.innerHeight) /
-                        9000
-                    )
-                )
-            );
-
-            particles = Array.from(
-                { length: amount },
-                () => ({
-                    x: Math.random() * window.innerWidth,
-                    y: Math.random() * window.innerHeight,
-                    size: Math.random() * 2.2 + 0.5,
-                    speedX:
-                        (Math.random() - 0.5) * 0.4,
-                    speedY:
-                        (Math.random() - 0.5) * 0.4,
-                    color:
-                        colours[
-                        Math.floor(
-                            Math.random() *
-                            colours.length
-                        )
-                        ],
-                    opacity:
-                        Math.random() * 0.38 + 0.1
-                })
-            );
-        }
+        let previousX: number | null = null;
+        let previousY: number | null = null;
 
         function resizeCanvas() {
             const pixelRatio = Math.min(
@@ -197,33 +179,134 @@ function Dashboard() {
                 0,
                 0
             );
+        }
 
-            createParticles();
+        function createParticle(
+            x: number,
+            y: number,
+            small: boolean
+        ) {
+            const angle =
+                Math.random() * Math.PI * 2;
+
+            const speed =
+                Math.random() * 0.55 + 0.08;
+
+            particles.push({
+                x:
+                    x +
+                    (Math.random() - 0.5) *
+                    (small ? 28 : 16),
+                y:
+                    y +
+                    (Math.random() - 0.5) *
+                    (small ? 28 : 16),
+                size: small
+                    ? Math.random() * 1.6 + 0.5
+                    : Math.random() * 2.8 + 1.3,
+                speedX:
+                    Math.cos(angle) * speed,
+                speedY:
+                    Math.sin(angle) * speed,
+                color:
+                    colours[
+                    Math.floor(
+                        Math.random() *
+                        colours.length
+                    )
+                    ],
+                createdAt: performance.now(),
+                lifetime:
+                    Math.random() * 300 + 1200
+            });
         }
 
         function handlePointerMove(
             event: PointerEvent
         ) {
-            mouse.x = event.clientX;
-            mouse.y = event.clientY;
-            mouse.active = true;
+            const currentX = event.clientX;
+            const currentY = event.clientY;
 
-            dashboard.style.setProperty(
-                "--mouse-x",
-                `${event.clientX}px`
+            if (
+                previousX === null ||
+                previousY === null
+            ) {
+                previousX = currentX;
+                previousY = currentY;
+
+                createParticle(
+                    currentX,
+                    currentY,
+                    false
+                );
+
+                return;
+            }
+
+            const distanceX =
+                currentX - previousX;
+
+            const distanceY =
+                currentY - previousY;
+
+            const distance = Math.sqrt(
+                distanceX * distanceX +
+                distanceY * distanceY
             );
 
-            dashboard.style.setProperty(
-                "--mouse-y",
-                `${event.clientY}px`
+            const steps = Math.min(
+                24,
+                Math.max(
+                    1,
+                    Math.ceil(distance / 9)
+                )
             );
+
+            for (
+                let step = 1;
+                step <= steps;
+                step++
+            ) {
+                const progress = step / steps;
+
+                const particleX =
+                    previousX +
+                    distanceX * progress;
+
+                const particleY =
+                    previousY +
+                    distanceY * progress;
+
+                createParticle(
+                    particleX,
+                    particleY,
+                    false
+                );
+
+                if (Math.random() < 0.18) {
+                    createParticle(
+                        particleX,
+                        particleY,
+                        true
+                    );
+                }
+            }
+
+            previousX = currentX;
+            previousY = currentY;
+
+            if (particles.length > 550) {
+                particles =
+                    particles.slice(-550);
+            }
         }
 
         function handlePointerLeave() {
-            mouse.active = false;
+            previousX = null;
+            previousY = null;
         }
 
-        function animate() {
+        function animate(animationTime: number) {
             context.clearRect(
                 0,
                 0,
@@ -231,118 +314,69 @@ function Dashboard() {
                 window.innerHeight
             );
 
-            particles.forEach((particle) => {
-                particle.x += particle.speedX;
-                particle.y += particle.speedY;
+            particles = particles.filter(
+                (particle) => {
+                    const age =
+                        animationTime -
+                        particle.createdAt;
 
-                if (particle.x < -10) {
-                    particle.x =
-                        window.innerWidth + 10;
-                }
+                    if (
+                        age >=
+                        particle.lifetime
+                    ) {
+                        return false;
+                    }
 
-                if (
-                    particle.x >
-                    window.innerWidth + 10
-                ) {
-                    particle.x = -10;
-                }
+                    const remainingLife =
+                        1 -
+                        age /
+                        particle.lifetime;
 
-                if (particle.y < -10) {
-                    particle.y =
-                        window.innerHeight + 10;
-                }
+                    particle.x +=
+                        particle.speedX;
 
-                if (
-                    particle.y >
-                    window.innerHeight + 10
-                ) {
-                    particle.y = -10;
-                }
+                    particle.y +=
+                        particle.speedY;
 
-                const distanceX =
-                    mouse.x - particle.x;
+                    particle.speedX *= 0.99;
+                    particle.speedY *= 0.99;
 
-                const distanceY =
-                    mouse.y - particle.y;
+                    const displayedSize =
+                        particle.size *
+                        (0.25 +
+                            remainingLife * 0.9);
 
-                const distance = Math.sqrt(
-                    distanceX * distanceX +
-                    distanceY * distanceY
-                );
-
-                const lightRadius = 270;
-
-                const lightStrength =
-                    mouse.active &&
-                        distance < lightRadius
-                        ? 1 -
-                        distance / lightRadius
-                        : 0;
-
-                const particleSize =
-                    particle.size +
-                    lightStrength * 4.5;
-
-                const particleOpacity = Math.min(
-                    1,
-                    particle.opacity +
-                    lightStrength * 0.9
-                );
-
-                context.beginPath();
-
-                context.arc(
-                    particle.x,
-                    particle.y,
-                    particleSize,
-                    0,
-                    Math.PI * 2
-                );
-
-                context.fillStyle =
-                    particle.color;
-
-                context.globalAlpha =
-                    particleOpacity;
-
-                if (lightStrength > 0) {
-                    context.shadowBlur =
-                        8 + lightStrength * 28;
-
-                    context.shadowColor =
-                        particle.color;
-                } else {
-                    context.shadowBlur = 0;
-                }
-
-                context.fill();
-
-                if (
-                    lightStrength > 0.4 &&
-                    distance < 120
-                ) {
                     context.beginPath();
 
-                    context.moveTo(
+                    context.arc(
                         particle.x,
-                        particle.y
+                        particle.y,
+                        displayedSize,
+                        0,
+                        Math.PI * 2
                     );
 
-                    context.lineTo(
-                        mouse.x,
-                        mouse.y
-                    );
-
-                    context.strokeStyle =
+                    context.fillStyle =
                         particle.color;
 
                     context.globalAlpha =
-                        lightStrength * 0.1;
+                        Math.pow(
+                            remainingLife,
+                            1.35
+                        );
 
-                    context.lineWidth = 0.7;
-                    context.stroke();
+                    context.shadowBlur =
+                        5 +
+                        remainingLife * 15;
+
+                    context.shadowColor =
+                        particle.color;
+
+                    context.fill();
+
+                    return true;
                 }
-            });
+            );
 
             context.globalAlpha = 1;
             context.shadowBlur = 0;
@@ -354,7 +388,9 @@ function Dashboard() {
         }
 
         resizeCanvas();
-        animate();
+
+        animationId =
+            window.requestAnimationFrame(animate);
 
         window.addEventListener(
             "resize",
@@ -390,8 +426,15 @@ function Dashboard() {
                 "pointerleave",
                 handlePointerLeave
             );
+
+            context.clearRect(
+                0,
+                0,
+                window.innerWidth,
+                window.innerHeight
+            );
         };
-    }, []);
+    }, [effectsEnabled]);
 
     useEffect(() => {
         return () => {
@@ -542,7 +585,6 @@ function Dashboard() {
 
     return (
         <div
-            ref={dashboardRef}
             className={
                 darkMode
                     ? "dashboard-page dark"
@@ -554,35 +596,33 @@ function Dashboard() {
                 className="particle-canvas"
             />
 
-            <div className="mouse-light" />
-            <div className="background-vignette" />
-
             <header className="dashboard-header">
-                <div className="brand">
-                    <div className="brand-icon">
-                        {(currentUser.name || "U")
-                            .charAt(0)
-                            .toUpperCase()}
-                    </div>
+                <button
+                    type="button"
+                    className={
+                        effectsEnabled
+                            ? "effects-toggle-button active"
+                            : "effects-toggle-button"
+                    }
+                    onClick={() =>
+                        setEffectsEnabled(
+                            (previous) => !previous
+                        )
+                    }
+                >
+                    <span className="effects-status-dot" />
 
-                    <div>
-                        <strong>
-                            Login Dashboard
-                        </strong>
-
-                        <span>
-                            Secure user area
-                        </span>
-                    </div>
-                </div>
+                    {effectsEnabled
+                        ? "Meteor Tail"
+                        : "Meteor Tail"}
+                </button>
 
                 <div className="header-actions">
                     <button
                         className="theme-button"
                         onClick={() =>
                             setDarkMode(
-                                (previous) =>
-                                    !previous
+                                (previous) => !previous
                             )
                         }
                     >
@@ -615,9 +655,8 @@ function Dashboard() {
                         </h1>
 
                         <p>
-                            Your account is active
-                            and securely
-                            authenticated.
+                            Your account is active and
+                            securely authenticated.
                         </p>
 
                         <div className="user-details">
@@ -663,10 +702,7 @@ function Dashboard() {
 
                         <div>
                             <span>Security</span>
-
-                            <strong>
-                                JWT Protected
-                            </strong>
+                            <strong>JWT Protected</strong>
                         </div>
                     </article>
 
@@ -697,9 +733,7 @@ function Dashboard() {
                         </div>
 
                         <div>
-                            <span>
-                                Local Time
-                            </span>
+                            <span>Local Time</span>
 
                             <strong>
                                 {currentTime.toLocaleTimeString(
@@ -707,8 +741,7 @@ function Dashboard() {
                                     {
                                         hour: "2-digit",
                                         minute: "2-digit",
-                                        second:
-                                            "2-digit"
+                                        second: "2-digit"
                                     }
                                 )}
                             </strong>
@@ -719,15 +752,11 @@ function Dashboard() {
                 <section className="section-heading">
                     <div>
                         <span>Mini Arcade</span>
-
-                        <h2>
-                            Take a quick break
-                        </h2>
+                        <h2>Take a quick break</h2>
                     </div>
 
                     <p>
-                        Test your luck and
-                        reaction speed.
+                        Test your luck and reaction speed.
                     </p>
                 </section>
 
@@ -744,17 +773,14 @@ function Dashboard() {
                                 </h3>
 
                                 <p>
-                                    Find the hidden
-                                    number.
+                                    Find the hidden number.
                                 </p>
                             </div>
                         </div>
 
                         <div className="guess-range">
                             <span>1</span>
-
                             <div className="range-line" />
-
                             <span>100</span>
                         </div>
 
@@ -770,13 +796,10 @@ function Dashboard() {
                                 placeholder="Your guess"
                                 onChange={(event) =>
                                     setGuess(
-                                        event.target
-                                            .value
+                                        event.target.value
                                     )
                                 }
-                                onKeyDown={(
-                                    event
-                                ) => {
+                                onKeyDown={(event) => {
                                     if (
                                         event.key ===
                                         "Enter" &&
@@ -807,9 +830,7 @@ function Dashboard() {
                                     : "game-message"
                             }
                         >
-                            <p>
-                                {guessMessage}
-                            </p>
+                            <p>{guessMessage}</p>
 
                             <span>
                                 Attempts:{" "}
@@ -825,13 +846,11 @@ function Dashboard() {
                             </div>
 
                             <div>
-                                <h3>
-                                    Reaction Speed
-                                </h3>
+                                <h3>Reaction Speed</h3>
 
                                 <p>
-                                    Click when the
-                                    colour changes.
+                                    Click when the colour
+                                    changes.
                                 </p>
                             </div>
                         </div>
@@ -841,8 +860,7 @@ function Dashboard() {
                                 <span>Latest</span>
 
                                 <strong>
-                                    {reactionTime ===
-                                        null
+                                    {reactionTime === null
                                         ? "—"
                                         : `${reactionTime} ms`}
                                 </strong>
@@ -852,25 +870,23 @@ function Dashboard() {
                                 <span>Best</span>
 
                                 <strong>
-                                    {bestReaction ===
-                                        null
+                                    {bestReaction === null
                                         ? "—"
                                         : `${bestReaction} ms`}
                                 </strong>
                             </div>
                         </div>
 
-                        {reactionState ===
-                            "idle" && (
-                                <button
-                                    className="reaction-start"
-                                    onClick={
-                                        startReactionGame
-                                    }
-                                >
-                                    Start Reaction Test
-                                </button>
-                            )}
+                        {reactionState === "idle" && (
+                            <button
+                                className="reaction-start"
+                                onClick={
+                                    startReactionGame
+                                }
+                            >
+                                Start Reaction Test
+                            </button>
+                        )}
 
                         {reactionState ===
                             "waiting" && (
@@ -884,39 +900,37 @@ function Dashboard() {
                                 </button>
                             )}
 
-                        {reactionState ===
-                            "ready" && (
+                        {reactionState === "ready" && (
+                            <button
+                                className="reaction-zone ready"
+                                onClick={
+                                    handleReactionClick
+                                }
+                            >
+                                CLICK NOW!
+                            </button>
+                        )}
+
+                        {reactionState === "early" && (
+                            <div className="reaction-result early">
+                                <strong>
+                                    Too early!
+                                </strong>
+
+                                <span>
+                                    Wait until the area
+                                    turns green.
+                                </span>
+
                                 <button
-                                    className="reaction-zone ready"
                                     onClick={
-                                        handleReactionClick
+                                        startReactionGame
                                     }
                                 >
-                                    CLICK NOW!
+                                    Try Again
                                 </button>
-                            )}
-
-                        {reactionState ===
-                            "early" && (
-                                <div className="reaction-result early">
-                                    <strong>
-                                        Too early!
-                                    </strong>
-
-                                    <span>
-                                        Wait until the
-                                        area turns green.
-                                    </span>
-
-                                    <button
-                                        onClick={
-                                            startReactionGame
-                                        }
-                                    >
-                                        Try Again
-                                    </button>
-                                </div>
-                            )}
+                            </div>
+                        )}
 
                         {reactionState ===
                             "finished" && (
