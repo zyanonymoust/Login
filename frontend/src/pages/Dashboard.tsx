@@ -190,17 +190,17 @@ function Dashboard() {
                 Math.random() * Math.PI * 2;
 
             const speed =
-                Math.random() * 0.55 + 0.08;
+                Math.random() * 0.3 + 0.04;
 
             particles.push({
                 x:
                     x +
                     (Math.random() - 0.5) *
-                    (small ? 28 : 16),
+                    (small ? 16 : 8),
                 y:
                     y +
                     (Math.random() - 0.5) *
-                    (small ? 28 : 16),
+                    (small ? 16 : 8),
                 size: small
                     ? Math.random() * 1.6 + 0.5
                     : Math.random() * 2.8 + 1.3,
