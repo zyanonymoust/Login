@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:18.3
-    container_name: login-postgres
     environment:
       POSTGRES_DB: logindb
       POSTGRES_USER: postgres
@@ -17,10 +16,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
   server:
     image: login-server
-    container_name: login-server
     build:
       context: .
       dockerfile: Login.Server/Dockerfile
@@ -40,7 +39,6 @@ services:
 
   frontend:
     image: login-frontend
-    container_name: login-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
