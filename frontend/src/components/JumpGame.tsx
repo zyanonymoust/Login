@@ -117,6 +117,8 @@ function JumpGame() {
     const nextPlatformIdRef = useRef(9);
     const scoreRef = useRef(0);
     const bonusTextRef = useRef("");
+    const bonusExtraTextRef = useRef("");
+    const bonusSwitchAtRef = useRef(0);
     const bonusUntilRef = useRef(0);
 
     const [gameState, setGameState] =
@@ -214,6 +216,8 @@ function JumpGame() {
         nextPlatformIdRef.current = 9;
         scoreRef.current = 0;
         bonusTextRef.current = "";
+        bonusExtraTextRef.current = "";
+        bonusSwitchAtRef.current = 0;
         bonusUntilRef.current = 0;
         previousTimeRef.current = null;
 
@@ -491,9 +495,11 @@ function JumpGame() {
                 index++
             ) {
                 const starX =
-                    (index * 137 -
+                    (
+                        index * 137 -
                         cameraXRef.current *
-                        0.08) %
+                        0.08
+                    ) %
                     GAME_WIDTH;
 
                 const positiveX =
@@ -503,8 +509,10 @@ function JumpGame() {
 
                 const starY =
                     28 +
-                    ((index * 83) %
-                        215);
+                    (
+                        (index * 83) %
+                        215
+                    );
 
                 const starSize =
                     index % 5 === 0
@@ -587,13 +595,13 @@ function JumpGame() {
             );
 
             context!.lineTo(0, 305);
-
             context!.lineTo(130, 250);
             context!.lineTo(260, 315);
             context!.lineTo(390, 242);
             context!.lineTo(520, 308);
             context!.lineTo(670, 245);
             context!.lineTo(810, 300);
+
             context!.lineTo(
                 GAME_WIDTH,
                 255
@@ -670,7 +678,6 @@ function JumpGame() {
                     topGradient;
 
                 context!.fill();
-
                 context!.shadowBlur = 0;
 
                 const baseGradient =
@@ -767,8 +774,10 @@ function JumpGame() {
 
             const playerX =
                 screenX -
-                (displayedWidth -
-                    player.width) /
+                (
+                    displayedWidth -
+                    player.width
+                ) /
                 2;
 
             context!.shadowColor =
@@ -813,7 +822,6 @@ function JumpGame() {
                 playerGradient;
 
             context!.fill();
-
             context!.shadowBlur = 0;
 
             const eyeY =
@@ -821,7 +829,6 @@ function JumpGame() {
                 displayedHeight * 0.34;
 
             context!.fillStyle = "#ffffff";
-
             context!.beginPath();
 
             context!.arc(
@@ -845,7 +852,6 @@ function JumpGame() {
             context!.fill();
 
             context!.fillStyle = "#251c63";
-
             context!.beginPath();
 
             context!.arc(
@@ -914,10 +920,26 @@ function JumpGame() {
                 return;
             }
 
+            const showingExtra =
+                animationTime >=
+                bonusSwitchAtRef.current;
+
+            const displayedBonus =
+                showingExtra
+                    ? bonusExtraTextRef.current
+                    : bonusTextRef.current;
+
+            const phaseEnd =
+                showingExtra
+                    ? bonusUntilRef.current
+                    : bonusSwitchAtRef.current;
+
             const remaining =
-                (bonusUntilRef.current -
-                    animationTime) /
-                850;
+                (
+                    phaseEnd -
+                    animationTime
+                ) /
+                500;
 
             context!.save();
 
@@ -941,7 +963,7 @@ function JumpGame() {
             context!.shadowBlur = 15;
 
             context!.fillText(
-                bonusTextRef.current,
+                displayedBonus,
                 GAME_WIDTH / 2,
                 92 -
                 (1 - remaining) * 24
@@ -1060,7 +1082,7 @@ function JumpGame() {
                             platform.id >
                             currentPlatformRef.current
                         ) {
-                            const platformMultiplier =
+                            const skippedPlatforms =
                                 platform.id -
                                 currentPlatformRef.current;
 
@@ -1069,8 +1091,7 @@ function JumpGame() {
 
                             const playerCentre =
                                 player.x +
-                                player.width /
-                                2;
+                                player.width / 2;
 
                             const platformCentre =
                                 platform.x +
@@ -1087,12 +1108,19 @@ function JumpGame() {
                                 centreDistance <=
                                 16;
 
-                            const baseScore =
+                            const landingPoint =
                                 perfect ? 3 : 1;
 
+                            const normalPoint =
+                                skippedPlatforms;
+
+                            const extraPoint =
+                                skippedPlatforms *
+                                landingPoint;
+
                             const addedScore =
-                                baseScore *
-                                platformMultiplier;
+                                normalPoint +
+                                extraPoint;
 
                             scoreRef.current +=
                                 addedScore;
@@ -1101,22 +1129,19 @@ function JumpGame() {
                                 scoreRef.current
                             );
 
-                            if (perfect) {
-                                bonusTextRef.current =
-                                    platformMultiplier > 1
-                                        ? `PERFECT ×${platformMultiplier} +${addedScore}`
-                                        : "PERFECT +3";
-                            }
-                            else {
-                                bonusTextRef.current =
-                                    platformMultiplier > 1
-                                        ? `SKIP ×${platformMultiplier} +${addedScore}`
-                                        : "+1";
-                            }
+                            bonusTextRef.current =
+                                `+${normalPoint}`;
+
+                            bonusExtraTextRef.current =
+                                `Extra +${extraPoint}`;
+
+                            bonusSwitchAtRef.current =
+                                animationTime +
+                                500;
 
                             bonusUntilRef.current =
                                 animationTime +
-                                850;
+                                1000;
 
                             while (
                                 platformsRef
@@ -1133,14 +1158,17 @@ function JumpGame() {
                 }
             }
 
-            const targetCamera = Math.max(
-                0,
-                player.x - 270
-            );
+            const targetCamera =
+                Math.max(
+                    0,
+                    player.x - 270
+                );
 
             cameraXRef.current +=
-                (targetCamera -
-                    cameraXRef.current) *
+                (
+                    targetCamera -
+                    cameraXRef.current
+                ) *
                 Math.min(
                     1,
                     deltaTime * 5
@@ -1164,12 +1192,15 @@ function JumpGame() {
                 previousTimeRef.current ??
                 animationTime;
 
-            const deltaTime = Math.min(
-                0.032,
-                (animationTime -
-                    previousTime) /
-                1000
-            );
+            const deltaTime =
+                Math.min(
+                    0.032,
+                    (
+                        animationTime -
+                        previousTime
+                    ) /
+                    1000
+                );
 
             previousTimeRef.current =
                 animationTime;
@@ -1254,7 +1285,9 @@ function JumpGame() {
 
                     <div>
                         <span>Best</span>
-                        <strong>{highScore}</strong>
+                        <strong>
+                            {highScore}
+                        </strong>
                     </div>
                 </div>
             </div>
