@@ -33,7 +33,7 @@ const GAME_WIDTH = 900;
 const GAME_HEIGHT = 420;
 const GRAVITY = 1150;
 const MAX_CHARGE_TIME = 1200;
-const MAX_POWER_HOLD_TIME = 2000;
+const MAX_POWER_HOLD_TIME = 1000;
 const CHARGE_CYCLE_TIME =
     MAX_CHARGE_TIME +
     MAX_POWER_HOLD_TIME;
@@ -1067,9 +1067,12 @@ function JumpGame() {
                             platform.id >
                             currentPlatformRef.current
                         ) {
-                            const skippedPlatforms =
+                            const platformDistance =
                                 platform.id -
                                 currentPlatformRef.current;
+
+                            const skippedPlatforms =
+                                platformDistance - 1;
 
                             currentPlatformRef.current =
                                 platform.id;
@@ -1094,12 +1097,12 @@ function JumpGame() {
                                 centreDistance <=
                                 16;
 
-                            const scorePerPlatform =
-                                perfect ? 3 : 2;
-
                             const addedScore =
-                                skippedPlatforms *
-                                scorePerPlatform;
+                                skippedPlatforms > 0
+                                    ? skippedPlatforms * 2
+                                    : perfect
+                                        ? 3
+                                        : 1;
 
                             scoreRef.current +=
                                 addedScore;
@@ -1109,9 +1112,11 @@ function JumpGame() {
                             );
 
                             bonusTextRef.current =
-                                perfect
-                                    ? `PERFECT +${addedScore}`
-                                    : `SKIP +${addedScore}`;
+                                skippedPlatforms > 0
+                                    ? `SKIP +${addedScore}`
+                                    : perfect
+                                        ? `PERFECT +${addedScore}`
+                                        : `+${addedScore}`;
 
                             bonusUntilRef.current =
                                 animationTime +
