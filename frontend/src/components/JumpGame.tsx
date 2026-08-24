@@ -250,24 +250,26 @@ function JumpGame() {
             return;
         }
 
-        const finalCharge = Math.max(
-            0.08,
-            chargeRef.current
-        );
+        const finalCharge =
+            chargeRef.current;
 
         chargingRef.current = false;
         chargeRef.current = 0;
         setCharge(0);
+
+        if (finalCharge < 0.05) {
+            return;
+        }
 
         const player = playerRef.current;
 
         player.grounded = false;
 
         player.velocityX =
-            220 + finalCharge * 330;
+            130 + finalCharge * 470;
 
         player.velocityY =
-            -(420 + finalCharge * 270);
+            -(300 + finalCharge * 430);
     }, []);
 
     const finishGame = useCallback(() => {
@@ -1008,13 +1010,30 @@ function JumpGame() {
                         const platform of
                         platformsRef.current
                     ) {
+                        const overlapLeft =
+                            Math.max(
+                                player.x,
+                                platform.x
+                            );
+
+                        const overlapRight =
+                            Math.min(
+                                player.x +
+                                player.width,
+                                platform.x +
+                                platform.width
+                            );
+
+                        const horizontalOverlap =
+                            Math.max(
+                                0,
+                                overlapRight -
+                                overlapLeft
+                            );
+
                         const horizontalHit =
-                            player.x +
-                            player.width >
-                            platform.x &&
-                            player.x <
-                            platform.x +
-                            platform.width;
+                            horizontalOverlap >
+                            player.width * 0.5;
 
                         const verticalHit =
                             previousBottom <=
@@ -1190,6 +1209,9 @@ function JumpGame() {
         };
     }, [addPlatform, finishGame]);
 
+    const chargePercent =
+        Math.round(charge * 100);
+
     return (
         <article className="jump-game-card">
             <div className="jump-game-header">
@@ -1315,10 +1337,7 @@ function JumpGame() {
                                     </span>
 
                                     <strong>
-                                        {Math.round(
-                                            charge * 100
-                                        )}
-                                        %
+                                        {chargePercent}%
                                     </strong>
                                 </div>
 
@@ -1327,7 +1346,7 @@ function JumpGame() {
                                         className="charge-fill"
                                         style={{
                                             width:
-                                                `${charge * 100}%`
+                                                `${chargePercent}%`
                                         }}
                                     />
                                 </div>

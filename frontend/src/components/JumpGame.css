@@ -270,7 +270,7 @@
     border-radius: inherit;
     background: linear-gradient( 90deg, #42e8db 0%, #62d7ff 45%, #9b72ff 72%, #ff6ec7 100% );
     box-shadow: 0 0 14px rgba(94, 223, 255, 0.7);
-    transition: width 0.04s linear;
+    transition: none;
 }
 
 .jump-game-instructions {
