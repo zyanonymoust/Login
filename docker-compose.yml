@@ -35,7 +35,7 @@ services:
       - "8083:8080"
     depends_on:
       postgres:
-        condition: service_healthy
+        condition: service_healthy                                                                                                                                                                                                                                                                                                                                                                                            
 
   frontend:
     image: login-frontend

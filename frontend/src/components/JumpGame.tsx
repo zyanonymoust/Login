@@ -313,13 +313,19 @@ function JumpGame() {
                 return;
             }
 
+            event.preventDefault();
+
             if (
                 gameStateRef.current ===
-                "playing"
+                "idle" ||
+                gameStateRef.current ===
+                "gameover"
             ) {
-                event.preventDefault();
-                beginCharge();
+                resetGame();
+                return;
             }
+
+            beginCharge();
         }
 
         function handleKeyUp(
@@ -383,7 +389,11 @@ function JumpGame() {
                 handlePointerUp
             );
         };
-    }, [beginCharge, releaseCharge]);
+    }, [
+        beginCharge,
+        releaseCharge,
+        resetGame
+    ]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -1223,6 +1233,17 @@ function JumpGame() {
                     }
 
                     event.preventDefault();
+
+                    if (
+                        gameStateRef.current ===
+                        "idle" ||
+                        gameStateRef.current ===
+                        "gameover"
+                    ) {
+                        resetGame();
+                        return;
+                    }
+
                     beginCharge();
                 }}
                 onContextMenu={(event) =>
