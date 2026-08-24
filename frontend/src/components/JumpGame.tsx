@@ -33,6 +33,8 @@ const GAME_WIDTH = 900;
 const GAME_HEIGHT = 420;
 const GRAVITY = 1150;
 const MAX_CHARGE_TIME = 1200;
+const CHARGE_CYCLE_TIME =
+    MAX_CHARGE_TIME;
 
 function createStartingPlatforms(): Platform[] {
     const platforms: Platform[] = [
@@ -117,8 +119,6 @@ function JumpGame() {
     const nextPlatformIdRef = useRef(9);
     const scoreRef = useRef(0);
     const bonusTextRef = useRef("");
-    const bonusExtraTextRef = useRef("");
-    const bonusSwitchAtRef = useRef(0);
     const bonusUntilRef = useRef(0);
 
     const [gameState, setGameState] =
@@ -216,8 +216,6 @@ function JumpGame() {
         nextPlatformIdRef.current = 9;
         scoreRef.current = 0;
         bonusTextRef.current = "";
-        bonusExtraTextRef.current = "";
-        bonusSwitchAtRef.current = 0;
         bonusUntilRef.current = 0;
         previousTimeRef.current = null;
 
@@ -276,6 +274,23 @@ function JumpGame() {
             -(300 + finalCharge * 430);
     }, []);
 
+    const toggleCharge = useCallback(() => {
+        if (
+            gameStateRef.current !==
+            "playing" ||
+            !playerRef.current.grounded
+        ) {
+            return;
+        }
+
+        if (chargingRef.current) {
+            releaseCharge();
+            return;
+        }
+
+        beginCharge();
+    }, [beginCharge, releaseCharge]);
+
     const finishGame = useCallback(() => {
         if (
             gameStateRef.current ===
@@ -312,14 +327,15 @@ function JumpGame() {
         function handleKeyDown(
             event: KeyboardEvent
         ) {
-            if (
-                event.code !== "Space" ||
-                event.repeat
-            ) {
+            if (event.code !== "Space") {
                 return;
             }
 
             event.preventDefault();
+
+            if (event.repeat) {
+                return;
+            }
 
             if (
                 gameStateRef.current ===
@@ -331,27 +347,7 @@ function JumpGame() {
                 return;
             }
 
-            beginCharge();
-        }
-
-        function handleKeyUp(
-            event: KeyboardEvent
-        ) {
-            if (event.code !== "Space") {
-                return;
-            }
-
-            if (
-                gameStateRef.current ===
-                "playing"
-            ) {
-                event.preventDefault();
-                releaseCharge();
-            }
-        }
-
-        function handlePointerUp() {
-            releaseCharge();
+            toggleCharge();
         }
 
         window.addEventListener(
@@ -359,46 +355,15 @@ function JumpGame() {
             handleKeyDown
         );
 
-        window.addEventListener(
-            "keyup",
-            handleKeyUp
-        );
-
-        window.addEventListener(
-            "pointerup",
-            handlePointerUp
-        );
-
-        window.addEventListener(
-            "pointercancel",
-            handlePointerUp
-        );
-
         return () => {
             window.removeEventListener(
                 "keydown",
                 handleKeyDown
             );
-
-            window.removeEventListener(
-                "keyup",
-                handleKeyUp
-            );
-
-            window.removeEventListener(
-                "pointerup",
-                handlePointerUp
-            );
-
-            window.removeEventListener(
-                "pointercancel",
-                handlePointerUp
-            );
         };
     }, [
-        beginCharge,
-        releaseCharge,
-        resetGame
+        resetGame,
+        toggleCharge
     ]);
 
     useEffect(() => {
@@ -495,11 +460,9 @@ function JumpGame() {
                 index++
             ) {
                 const starX =
-                    (
-                        index * 137 -
+                    (index * 137 -
                         cameraXRef.current *
-                        0.08
-                    ) %
+                        0.08) %
                     GAME_WIDTH;
 
                 const positiveX =
@@ -509,10 +472,8 @@ function JumpGame() {
 
                 const starY =
                     28 +
-                    (
-                        (index * 83) %
-                        215
-                    );
+                    ((index * 83) %
+                        215);
 
                 const starSize =
                     index % 5 === 0
@@ -595,13 +556,13 @@ function JumpGame() {
             );
 
             context!.lineTo(0, 305);
+
             context!.lineTo(130, 250);
             context!.lineTo(260, 315);
             context!.lineTo(390, 242);
             context!.lineTo(520, 308);
             context!.lineTo(670, 245);
             context!.lineTo(810, 300);
-
             context!.lineTo(
                 GAME_WIDTH,
                 255
@@ -678,6 +639,7 @@ function JumpGame() {
                     topGradient;
 
                 context!.fill();
+
                 context!.shadowBlur = 0;
 
                 const baseGradient =
@@ -758,13 +720,16 @@ function JumpGame() {
                 chargingRef.current &&
                 player.grounded
             ) {
+                const visualCharge =
+                    chargeRef.current;
+
                 displayedHeight =
                     player.height -
-                    chargeRef.current * 13;
+                    visualCharge * 13;
 
                 displayedWidth =
                     player.width +
-                    chargeRef.current * 10;
+                    visualCharge * 10;
 
                 displayedY =
                     player.y +
@@ -774,10 +739,8 @@ function JumpGame() {
 
             const playerX =
                 screenX -
-                (
-                    displayedWidth -
-                    player.width
-                ) /
+                (displayedWidth -
+                    player.width) /
                 2;
 
             context!.shadowColor =
@@ -822,6 +785,7 @@ function JumpGame() {
                 playerGradient;
 
             context!.fill();
+
             context!.shadowBlur = 0;
 
             const eyeY =
@@ -829,6 +793,7 @@ function JumpGame() {
                 displayedHeight * 0.34;
 
             context!.fillStyle = "#ffffff";
+
             context!.beginPath();
 
             context!.arc(
@@ -852,6 +817,7 @@ function JumpGame() {
             context!.fill();
 
             context!.fillStyle = "#251c63";
+
             context!.beginPath();
 
             context!.arc(
@@ -920,26 +886,10 @@ function JumpGame() {
                 return;
             }
 
-            const showingExtra =
-                animationTime >=
-                bonusSwitchAtRef.current;
-
-            const displayedBonus =
-                showingExtra
-                    ? bonusExtraTextRef.current
-                    : bonusTextRef.current;
-
-            const phaseEnd =
-                showingExtra
-                    ? bonusUntilRef.current
-                    : bonusSwitchAtRef.current;
-
             const remaining =
-                (
-                    phaseEnd -
-                    animationTime
-                ) /
-                500;
+                (bonusUntilRef.current -
+                    animationTime) /
+                850;
 
             context!.save();
 
@@ -963,7 +913,7 @@ function JumpGame() {
             context!.shadowBlur = 15;
 
             context!.fillText(
-                displayedBonus,
+                bonusTextRef.current,
                 GAME_WIDTH / 2,
                 92 -
                 (1 - remaining) * 24
@@ -994,12 +944,13 @@ function JumpGame() {
                     animationTime -
                     chargeStartedAtRef.current;
 
+                const cycleElapsed =
+                    elapsed %
+                    CHARGE_CYCLE_TIME;
+
                 const nextCharge =
-                    Math.min(
-                        1,
-                        elapsed /
-                        MAX_CHARGE_TIME
-                    );
+                    cycleElapsed /
+                    MAX_CHARGE_TIME;
 
                 chargeRef.current =
                     nextCharge;
@@ -1091,7 +1042,8 @@ function JumpGame() {
 
                             const playerCentre =
                                 player.x +
-                                player.width / 2;
+                                player.width /
+                                2;
 
                             const platformCentre =
                                 platform.x +
@@ -1108,19 +1060,12 @@ function JumpGame() {
                                 centreDistance <=
                                 16;
 
-                            const landingPoint =
-                                perfect ? 3 : 1;
-
-                            const normalPoint =
-                                skippedPlatforms;
-
-                            const extraPoint =
-                                skippedPlatforms *
-                                landingPoint;
+                            const scorePerPlatform =
+                                perfect ? 3 : 2;
 
                             const addedScore =
-                                normalPoint +
-                                extraPoint;
+                                skippedPlatforms *
+                                scorePerPlatform;
 
                             scoreRef.current +=
                                 addedScore;
@@ -1130,18 +1075,13 @@ function JumpGame() {
                             );
 
                             bonusTextRef.current =
-                                `+${normalPoint}`;
-
-                            bonusExtraTextRef.current =
-                                `Extra +${extraPoint}`;
-
-                            bonusSwitchAtRef.current =
-                                animationTime +
-                                500;
+                                perfect
+                                    ? `PERFECT +${addedScore}`
+                                    : `SKIP +${addedScore}`;
 
                             bonusUntilRef.current =
                                 animationTime +
-                                1000;
+                                850;
 
                             while (
                                 platformsRef
@@ -1158,17 +1098,14 @@ function JumpGame() {
                 }
             }
 
-            const targetCamera =
-                Math.max(
-                    0,
-                    player.x - 270
-                );
+            const targetCamera = Math.max(
+                0,
+                player.x - 270
+            );
 
             cameraXRef.current +=
-                (
-                    targetCamera -
-                    cameraXRef.current
-                ) *
+                (targetCamera -
+                    cameraXRef.current) *
                 Math.min(
                     1,
                     deltaTime * 5
@@ -1192,15 +1129,12 @@ function JumpGame() {
                 previousTimeRef.current ??
                 animationTime;
 
-            const deltaTime =
-                Math.min(
-                    0.032,
-                    (
-                        animationTime -
-                        previousTime
-                    ) /
-                    1000
-                );
+            const deltaTime = Math.min(
+                0.032,
+                (animationTime -
+                    previousTime) /
+                1000
+            );
 
             previousTimeRef.current =
                 animationTime;
@@ -1259,6 +1193,9 @@ function JumpGame() {
     const chargePercent =
         Math.round(charge * 100);
 
+    const chargeBarPercent =
+        chargePercent;
+
     return (
         <article className="jump-game-card">
             <div className="jump-game-header">
@@ -1271,8 +1208,8 @@ function JumpGame() {
                         <h3>Jump Adventure</h3>
 
                         <p>
-                            Hold to charge and release
-                            to jump.
+                            Press once to charge and
+                            press again to jump.
                         </p>
                     </div>
                 </div>
@@ -1285,9 +1222,7 @@ function JumpGame() {
 
                     <div>
                         <span>Best</span>
-                        <strong>
-                            {highScore}
-                        </strong>
+                        <strong>{highScore}</strong>
                     </div>
                 </div>
             </div>
@@ -1315,7 +1250,7 @@ function JumpGame() {
                         return;
                     }
 
-                    beginCharge();
+                    toggleCharge();
                 }}
                 onContextMenu={(event) =>
                     event.preventDefault()
@@ -1376,7 +1311,9 @@ function JumpGame() {
                     "playing" && (
                         <>
                             <div className="jump-game-help">
-                                Hold mouse or Space
+                                {chargingRef.current
+                                    ? "Press again to jump"
+                                    : "Press to start power"}
                             </div>
 
                             <div className="charge-container">
@@ -1395,7 +1332,7 @@ function JumpGame() {
                                         className="charge-fill"
                                         style={{
                                             width:
-                                                `${chargePercent}%`
+                                                `${chargeBarPercent}%`
                                         }}
                                     />
                                 </div>
@@ -1406,11 +1343,11 @@ function JumpGame() {
 
             <div className="jump-game-instructions">
                 <span>
-                    🖱️ Hold and release
+                    🖱️ Click twice
                 </span>
 
                 <span>
-                    ⌨️ Space bar
+                    ⌨️ Press Space twice
                 </span>
 
                 <span>
