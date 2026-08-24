@@ -1057,9 +1057,13 @@ function JumpGame() {
                         player.grounded = true;
 
                         if (
-                            platform.id !==
+                            platform.id >
                             currentPlatformRef.current
                         ) {
+                            const platformMultiplier =
+                                platform.id -
+                                currentPlatformRef.current;
+
                             currentPlatformRef.current =
                                 platform.id;
 
@@ -1083,8 +1087,12 @@ function JumpGame() {
                                 centreDistance <=
                                 16;
 
-                            const addedScore =
+                            const baseScore =
                                 perfect ? 3 : 1;
+
+                            const addedScore =
+                                baseScore *
+                                platformMultiplier;
 
                             scoreRef.current +=
                                 addedScore;
@@ -1093,10 +1101,18 @@ function JumpGame() {
                                 scoreRef.current
                             );
 
-                            bonusTextRef.current =
-                                perfect
-                                    ? "PERFECT +3"
-                                    : "+1";
+                            if (perfect) {
+                                bonusTextRef.current =
+                                    platformMultiplier > 1
+                                        ? `PERFECT ×${platformMultiplier} +${addedScore}`
+                                        : "PERFECT +3";
+                            }
+                            else {
+                                bonusTextRef.current =
+                                    platformMultiplier > 1
+                                        ? `SKIP ×${platformMultiplier} +${addedScore}`
+                                        : "+1";
+                            }
 
                             bonusUntilRef.current =
                                 animationTime +
