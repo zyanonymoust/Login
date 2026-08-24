@@ -33,8 +33,10 @@ const GAME_WIDTH = 900;
 const GAME_HEIGHT = 420;
 const GRAVITY = 1150;
 const MAX_CHARGE_TIME = 1200;
+const MAX_POWER_HOLD_TIME = 2000;
 const CHARGE_CYCLE_TIME =
-    MAX_CHARGE_TIME;
+    MAX_CHARGE_TIME +
+    MAX_POWER_HOLD_TIME;
 
 function createStartingPlatforms(): Platform[] {
     const platforms: Platform[] = [
@@ -274,23 +276,6 @@ function JumpGame() {
             -(300 + finalCharge * 430);
     }, []);
 
-    const toggleCharge = useCallback(() => {
-        if (
-            gameStateRef.current !==
-            "playing" ||
-            !playerRef.current.grounded
-        ) {
-            return;
-        }
-
-        if (chargingRef.current) {
-            releaseCharge();
-            return;
-        }
-
-        beginCharge();
-    }, [beginCharge, releaseCharge]);
-
     const finishGame = useCallback(() => {
         if (
             gameStateRef.current ===
@@ -347,7 +332,22 @@ function JumpGame() {
                 return;
             }
 
-            toggleCharge();
+            beginCharge();
+        }
+
+        function handleKeyUp(
+            event: KeyboardEvent
+        ) {
+            if (event.code !== "Space") {
+                return;
+            }
+
+            event.preventDefault();
+            releaseCharge();
+        }
+
+        function handlePointerUp() {
+            releaseCharge();
         }
 
         window.addEventListener(
@@ -355,15 +355,46 @@ function JumpGame() {
             handleKeyDown
         );
 
+        window.addEventListener(
+            "keyup",
+            handleKeyUp
+        );
+
+        window.addEventListener(
+            "pointerup",
+            handlePointerUp
+        );
+
+        window.addEventListener(
+            "pointercancel",
+            handlePointerUp
+        );
+
         return () => {
             window.removeEventListener(
                 "keydown",
                 handleKeyDown
             );
+
+            window.removeEventListener(
+                "keyup",
+                handleKeyUp
+            );
+
+            window.removeEventListener(
+                "pointerup",
+                handlePointerUp
+            );
+
+            window.removeEventListener(
+                "pointercancel",
+                handlePointerUp
+            );
         };
     }, [
+        beginCharge,
+        releaseCharge,
         resetGame,
-        toggleCharge
     ]);
 
     useEffect(() => {
@@ -949,8 +980,11 @@ function JumpGame() {
                     CHARGE_CYCLE_TIME;
 
                 const nextCharge =
-                    cycleElapsed /
-                    MAX_CHARGE_TIME;
+                    cycleElapsed >=
+                        MAX_CHARGE_TIME
+                        ? 1
+                        : cycleElapsed /
+                        MAX_CHARGE_TIME;
 
                 chargeRef.current =
                     nextCharge;
@@ -1208,8 +1242,8 @@ function JumpGame() {
                         <h3>Jump Adventure</h3>
 
                         <p>
-                            Press once to charge and
-                            press again to jump.
+                            Hold to charge and release
+                            to jump.
                         </p>
                     </div>
                 </div>
@@ -1250,7 +1284,7 @@ function JumpGame() {
                         return;
                     }
 
-                    toggleCharge();
+                    beginCharge();
                 }}
                 onContextMenu={(event) =>
                     event.preventDefault()
@@ -1311,9 +1345,7 @@ function JumpGame() {
                     "playing" && (
                         <>
                             <div className="jump-game-help">
-                                {chargingRef.current
-                                    ? "Press again to jump"
-                                    : "Press to start power"}
+                                Hold mouse or Space
                             </div>
 
                             <div className="charge-container">
@@ -1343,11 +1375,11 @@ function JumpGame() {
 
             <div className="jump-game-instructions">
                 <span>
-                    🖱️ Click twice
+                    🖱️ Hold and release
                 </span>
 
                 <span>
-                    ⌨️ Press Space twice
+                    ⌨️ Space bar
                 </span>
 
                 <span>
