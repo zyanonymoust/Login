@@ -3,6 +3,10 @@ pipeline {
 
     environment {
         COMPOSE_EXE = 'C:/Users/Hp/AppData/Local/Programs/DockerDesktop/resources/bin/docker-compose.exe'
+        POSTGRES_HOST_PORT = '5438'
+        SERVER_HOST_PORT = '8084'
+        FRONTEND_HOST_PORT = '3003'
+        E2E_BASE_URL = 'http://localhost:3003'
     }
 
     options {
@@ -40,7 +44,7 @@ pipeline {
 
         stage('Wait For Frontend') {
             steps {
-                bat 'powershell.exe -NoProfile -Command "for ($i = 0; $i -lt 30; $i++) { try { Invoke-WebRequest -UseBasicParsing http://localhost:3002 | Out-Null; exit 0 } catch { Start-Sleep -Seconds 2 } }; exit 1"'
+                bat 'powershell.exe -NoProfile -Command "for ($i = 0; $i -lt 30; $i++) { try { Invoke-WebRequest -UseBasicParsing %E2E_BASE_URL% | Out-Null; exit 0 } catch { Start-Sleep -Seconds 2 } }; exit 1"'
             }
         }
 

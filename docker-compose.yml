@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: LoginDb1234
     ports:
-      - "5437:5432"
+      - "${POSTGRES_HOST_PORT:-5437}:5432"
     volumes:
       - login-postgres-data:/var/lib/postgresql
     healthcheck:
@@ -32,7 +32,7 @@ services:
       Jwt__Key: docker-development-secret-key-at-least-32-characters
       Jwt__ExpirationMinutes: 120
     ports:
-      - "8083:8080"
+      - "${SERVER_HOST_PORT:-8083}:8080"
     depends_on:
       postgres:
         condition: service_healthy                                                                                                                                                                                                                                                                                                                                                                                            
@@ -43,9 +43,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:8083
+        VITE_API_URL: "http://localhost:${SERVER_HOST_PORT:-8083}"
     ports:
-      - "3002:80"
+      - "${FRONTEND_HOST_PORT:-3002}:80"
     depends_on:
       - server
 
