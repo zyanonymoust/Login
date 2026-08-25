@@ -83,18 +83,18 @@ function Login() {
             <section className="auth-card">
                 <aside className="auth-brand">
                     <div className="brand-content">
-                        <div className="brand-icon">✓</div>
+                        <Link className="brand-icon" to="/" aria-label="Back to Woven home">W</Link>
 
-                        <h2>TaskFlow</h2>
+                        <h2>Woven</h2>
 
                         <p>
-                            Sign in and continue managing your tasks.
+                            Your conversations, communities and moments—all in one calm place.
                         </p>
 
                         <ul>
-                            <li>✓ Organize daily tasks</li>
-                            <li>✓ Track your progress</li>
-                            <li>✓ Stay productive</li>
+                            <li><span>●</span> Message friends in real time</li>
+                            <li><span>●</span> Join rooms and start meetings</li>
+                            <li><span>●</span> Make your space feel personal</li>
                         </ul>
                     </div>
                 </aside>
@@ -104,10 +104,10 @@ function Login() {
                         WELCOME BACK
                     </p>
 
-                    <h1>Login</h1>
+                    <h1>Welcome back</h1>
 
                     <p className="auth-subtitle">
-                        Enter your details to continue.
+                        Sign in to reconnect with your people.
                     </p>
 
                     <form
@@ -179,7 +179,7 @@ function Login() {
                         >
                             {loading
                                 ? "Logging in..."
-                                : "Login"}
+                                : "Sign in to Woven"}
                         </button>
                     </form>
 

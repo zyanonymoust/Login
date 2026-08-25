@@ -24,7 +24,11 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("logindb")));
+        builder.Configuration.GetConnectionString("logindb"),
+        npgsql => npgsql.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorCodesToAdd: null)));
 
 builder.Services.AddScoped<TokenService>();
 

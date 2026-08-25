@@ -159,8 +159,8 @@ export default function GroupSpace({
       setMembers((items) => items.map((x) => x.userId === member.userId ? { ...x, isMuted: !x.isMuted } : x));
     },
     editDetails = async () => {
-      if (!active) return; const name = window.prompt("Room name", active.name); if (!name) return;
-      const description = window.prompt("Room description", active.description || "") ?? active.description;
+      if (!active) return; const name = window.prompt("Group name", active.name); if (!name) return;
+      const description = window.prompt("Group description", active.description || "") ?? active.description;
       await apiRequest(`/api/groups/${active.id}/details`, { method: "PUT", body: JSON.stringify({ name, description }) });
       setActive({ ...active, name, description }); onRoomsChanged();
     };
@@ -168,7 +168,7 @@ export default function GroupSpace({
     <section className="group-space">
       <aside className="room-list">
         <div>
-          <h3>Rooms</h3>
+          <h3>Groups</h3>
           <button onClick={() => setShowCreate(!showCreate)}>＋</button>
         </div>
         {showCreate && (
@@ -176,15 +176,15 @@ export default function GroupSpace({
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Room name"
+              placeholder="Group name"
               autoFocus
             />
-            <textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="What is this room about?" maxLength={500} />
+            <textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="What is this group about?" maxLength={500} />
             <div className="room-privacy">
               <button type="button" className={isPublic ? "active" : ""} onClick={() => setIsPublic(true)}>🌐 Public</button>
               <button type="button" className={!isPublic ? "active" : ""} onClick={() => setIsPublic(false)}>🔒 Private</button>
             </div>
-            <button>Create room</button>
+            <button>Create group</button>
           </form>
         )}
         {pending.map((r) => (
@@ -210,7 +210,7 @@ export default function GroupSpace({
             </span>
           </button>
         ))}
-        {publicRooms.length > 0 && <h4 className="discover-title">Discover public rooms</h4>}
+        {publicRooms.length > 0 && <h4 className="discover-title">Discover public groups</h4>}
         {publicRooms.map((r) => (
           <button className="room-row public-room-row" key={r.id} onClick={() => joinPublic(r)}>
             <i>🌐</i><span><strong>{r.name}</strong><small>{r.memberCount} members · Click to join</small></span><b>＋</b>
@@ -222,9 +222,9 @@ export default function GroupSpace({
           <div className="room-empty">
             <div>👥</div>
             <h2>Create a space together</h2>
-            <p>Start a room, invite people, chat, and meet face to face.</p>
+            <p>Start a group, invite people, chat, and meet face to face.</p>
             <button onClick={() => setShowCreate(true)}>
-              Create your first room
+              Create your first group
             </button>
           </div>
         ) : (
@@ -296,7 +296,7 @@ export default function GroupSpace({
               <input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder={`Message ${active.name}`}
+                placeholder="Type something…"
               />
               <button>↑</button>
             </form>
@@ -335,8 +335,9 @@ function Meeting({
     [error, setError] = useState("");
   useEffect(() => {
     let alive = true;
+    const activePeers = peers.current;
     const makePeer = (id: string) => {
-      let pc = peers.current.get(id);
+      let pc = activePeers.get(id);
       if (pc) return pc;
       pc = new RTCPeerConnection({
         iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -357,7 +358,7 @@ function Meeting({
         setRemote((x) =>
           x.some((y) => y.id === id) ? x : [...x, { id, stream: e.streams[0] }],
         );
-      peers.current.set(id, pc);
+      activePeers.set(id, pc);
       return pc;
     };
     const joined = async ({ connectionId }: { connectionId: string }) => {
@@ -401,8 +402,8 @@ function Meeting({
       else if (kind === "ice") await pc.addIceCandidate(data);
     };
     const left = ({ connectionId }: { connectionId: string }) => {
-      peers.current.get(connectionId)?.close();
-      peers.current.delete(connectionId);
+      activePeers.get(connectionId)?.close();
+      activePeers.delete(connectionId);
       setRemote((x) => x.filter((y) => y.id !== connectionId));
     };
     connection.on("MeetingParticipantJoined", joined);
@@ -426,7 +427,7 @@ function Meeting({
       connection.off("MeetingParticipantLeft", left);
       connection.invoke("LeaveMeeting", room.id).catch(() => {});
       localStream.current?.getTracks().forEach((t) => t.stop());
-      peers.current.forEach((p) => p.close());
+      activePeers.forEach((p) => p.close());
     };
   }, [connection, room.id]);
   const leave = () => close(),

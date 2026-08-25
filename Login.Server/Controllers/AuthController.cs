@@ -99,6 +99,10 @@ public class AuthController : ControllerBase
             });
         }
 
+        user.Status = "Available";
+        user.LastSeenAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
         var tokenResult = _tokenService.CreateToken(user);
 
         return Ok(new AuthResponse

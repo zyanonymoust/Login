@@ -55,18 +55,18 @@ function Register() {
             <section className="auth-card">
                 <aside className="auth-brand">
                     <div className="brand-content">
-                        <div className="brand-icon">✓</div>
+                        <Link className="brand-icon" to="/" aria-label="Back to Woven home">W</Link>
 
-                        <h2>TaskFlow</h2>
+                        <h2>Woven</h2>
 
                         <p>
-                            Create your account and manage every task in one place.
+                            Create a space for the people and conversations that matter.
                         </p>
 
                         <ul>
-                            <li>✓ Organize daily tasks</li>
-                            <li>✓ Track your progress</li>
-                            <li>✓ Stay productive</li>
+                            <li><span>●</span> Find and connect with friends</li>
+                            <li><span>●</span> Share messages, images and files</li>
+                            <li><span>●</span> Create private or public groups</li>
                         </ul>
                     </div>
                 </aside>
@@ -74,10 +74,10 @@ function Register() {
                 <div className="auth-form-panel">
                     <p className="auth-label">GET STARTED</p>
 
-                    <h1>Create Account</h1>
+                    <h1>Join Woven</h1>
 
                     <p className="auth-subtitle">
-                        Enter your details to continue.
+                        Your new social space is a minute away.
                     </p>
 
                     <form className="auth-form" onSubmit={handleSubmit}>
@@ -180,7 +180,7 @@ function Register() {
                         >
                             {loading
                                 ? "Creating..."
-                                : "Create Account"}
+                                : "Create my account"}
                         </button>
                     </form>
 

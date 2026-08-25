@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { FormEvent, ChangeEvent } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import type { SubmitEvent, ChangeEvent } from "react";
 import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import { useNavigate } from "react-router";
 import { API_BASE_URL, apiRequest } from "../services/api";
@@ -47,6 +47,7 @@ export default function Dashboard() {
     [people, setPeople] = useState<Person[]>([]),
     [selected, setSelected] = useState<Person | null>(null),
     [messages, setMessages] = useState<Message[]>([]),
+    [messageDetails, setMessageDetails] = useState<Message | null>(null),
     [draft, setDraft] = useState(""),
     [uploading, setUploading] = useState(false),
     [groupRooms, setGroupRooms] = useState<GroupRoom[]>([]),
@@ -63,16 +64,22 @@ export default function Dashboard() {
     ),
     [chatBg, setChatBg] = useState(
       () => localStorage.getItem("woven-chat-bg") || "default",
-    );
+    ),
+    [pointerEffect, setPointerEffect] = useState(
+      () => localStorage.getItem("woven-pointer-effect") || "default",
+    ),
+    [friendshipStreak] = useState(updateActivityStreak);
   const refresh = useCallback(async () => {
     try {
       const d = await apiRequest<Person[]>("/api/social/people");
       setPeople(d);
       setSelected((s) => (s ? d.find((x) => x.id === s.id) || null : s));
-    } catch {}
+    } catch {
+      return;
+    }
   }, []);
   const refreshGroups = useCallback(async () => {
-    try { setGroupRooms(await apiRequest<GroupRoom[]>("/api/groups")); } catch { /* signed-out transition */ }
+    try { setGroupRooms(await apiRequest<GroupRoom[]>("/api/groups")); } catch { return; }
   }, []);
   useEffect(() => {
     apiRequest<Me>("/api/auth/me")
@@ -99,6 +106,27 @@ export default function Dashboard() {
   useEffect(() => localStorage.setItem("woven-theme", theme), [theme]);
   useEffect(() => localStorage.setItem("woven-dark", darkMode ? "on" : "off"), [darkMode]);
   useEffect(() => localStorage.setItem("woven-chat-bg", chatBg), [chatBg]);
+  useEffect(() => {
+    localStorage.setItem("woven-pointer-effect", pointerEffect);
+    if (pointerEffect === "default" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let lastPaint = 0;
+    const paint = (event: PointerEvent) => {
+      if (event.pointerType === "touch" || performance.now() - lastPaint < 14) return;
+      lastPaint = performance.now();
+      const particle = document.createElement("i");
+      particle.className = `pointer-particle ${pointerEffect}`;
+      particle.style.left = `${event.clientX}px`;
+      particle.style.top = `${event.clientY}px`;
+      if (pointerEffect === "sparkles") particle.textContent = "✦";
+      document.body.appendChild(particle);
+      window.setTimeout(() => particle.remove(), 800);
+    };
+    window.addEventListener("pointermove", paint, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", paint);
+      document.querySelectorAll(".pointer-particle").forEach((item) => item.remove());
+    };
+  }, [pointerEffect]);
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -168,7 +196,7 @@ export default function Dashboard() {
     },
     acceptGroup = async (room: GroupRoom) => { await apiRequest(`/api/groups/${room.id}/accept`, { method: "POST" }); await refreshGroups(); },
     declineGroup = async (room: GroupRoom) => { await apiRequest(`/api/groups/${room.id}/invite`, { method: "DELETE" }); await refreshGroups(); },
-    send = async (e: FormEvent) => {
+    send = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!selected || !draft.trim()) return;
       const content = draft;
@@ -179,7 +207,7 @@ export default function Dashboard() {
       });
       setMessages(await apiRequest<Message[]>(`/api/messages/${selected.id}`));
     },
-    save = async (e: FormEvent<HTMLFormElement>) => {
+    save = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       const f = new FormData(e.currentTarget),
         u = await apiRequest<Me>("/api/social/profile", {
@@ -255,7 +283,7 @@ export default function Dashboard() {
             {unread > 0 && <b>{unread}</b>}
           </button>
           <button className={view === "groups" ? "active" : ""} onClick={() => setView("groups")}>
-            👥<span>Rooms</span>{pendingGroups.length > 0 && <b>{pendingGroups.length}</b>}
+            👥<span>Groups</span>{pendingGroups.length > 0 && <b>{pendingGroups.length}</b>}
           </button>
         </nav>
         <div className="side-bottom">
@@ -329,7 +357,7 @@ export default function Dashboard() {
                   : view === "settings"
                     ? "Appearance"
                     : view === "groups"
-                      ? "Rooms & meetings"
+                      ? "Groups"
                     : "Good day, " + (me.name?.split(" ")[0] || "friend")}
             </h2>
           </div>
@@ -382,12 +410,13 @@ export default function Dashboard() {
                   {unread} unread messages
                 </p>
               </div>
-              <div className="orb">
-                <i />
-                <Avatar name={me.name} />
+              <div className="welcome-streak">
+                <div className="friendship-streak"><span>🔥</span><strong>{friendshipStreak} day{friendshipStreak === 1 ? "" : "s"}</strong><small>Friendship streak</small></div>
               </div>
             </div>
-            <h3>Jump back in</h3>
+            <div className="quick-heading">
+              <h3>Jump back in</h3>
+            </div>
             <div className="quick-grid">
               {friends.slice(0, 3).map((p) => (
                 <button key={p.id} onClick={() => choose(p)}>
@@ -407,7 +436,6 @@ export default function Dashboard() {
               )}
             </div>
             <BoredomBreak />
-            <div className="jump-game-wrap"><JumpGame /></div>
           </section>
         )}
         {view === "groups" && <GroupSpace rooms={groupRooms} people={people} me={me} onRoomsChanged={refreshGroups} />}
@@ -417,7 +445,7 @@ export default function Dashboard() {
             style={
               chatBg.startsWith("data:")
                 ? {
-                    backgroundImage: `linear-gradient(#fbfafce8,#fbfafce8), url(${chatBg})`,
+                    backgroundImage: `linear-gradient(${darkMode ? "#090d18e8" : "#fbfafce8"},${darkMode ? "#090d18e8" : "#fbfafce8"}), url(${chatBg})`,
                   }
                 : undefined
             }
@@ -449,26 +477,35 @@ export default function Dashboard() {
                   <p>Say hello to {selected.name}.</p>
                 </div>
               )}
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`message ${m.senderId === (me.id || me.userId) ? "mine" : "theirs"}`}
-                >
-                  <p>{m.content}</p>
-                  {m.attachmentUrl && <MessageAttachment message={m} />}
-                  <small>
-                    {new Date(m.sentAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {m.senderId === (me.id || me.userId) && (
-                      <span className={m.readAt ? "read-state read" : "read-state"}>
-                        {m.readAt ? " ✓✓ Read" : " ✓ Sent"}
-                      </span>
-                    )}
-                  </small>
-                </div>
-              ))}
+              {messages.map((m, index) => {
+                const day = new Date(m.sentAt),
+                  previousDay = index > 0 ? new Date(messages[index - 1].sentAt) : null,
+                  startsDay = !previousDay || day.toDateString() !== previousDay.toDateString();
+                return (
+                  <Fragment key={m.id}>
+                    {startsDay && <div className="date-separator"><span>{chatDateLabel(day)}</span></div>}
+                    <div
+                      className={`message ${m.senderId === (me.id || me.userId) ? "mine" : "theirs"}`}
+                      onDoubleClick={() => setMessageDetails(m)}
+                      onKeyDown={(event) => event.key === "Enter" && setMessageDetails(m)}
+                      role="button"
+                      tabIndex={0}
+                      title="Double-click for message details"
+                    >
+                      <p>{m.content}</p>
+                      {m.attachmentUrl && <MessageAttachment message={m} />}
+                      {m.senderId === (me.id || me.userId) && (
+                        <small>
+                          {day.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          <span className={m.readAt ? "read-state read" : "read-state"}>
+                            {m.readAt ? " ✓✓ Read" : " ✓ Sent"}
+                          </span>
+                        </small>
+                      )}
+                    </div>
+                  </Fragment>
+                );
+              })}
             </div>
             <form className="composer" onSubmit={send}>
               <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading} title="Add image or file">{uploading ? "…" : "＋"}</button>
@@ -476,10 +513,25 @@ export default function Dashboard() {
               <input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder={`Message ${selected.name}`}
+                placeholder="Type something…"
               />
               <button className="send">↑</button>
             </form>
+            {messageDetails && (
+              <div className="message-detail-backdrop" onClick={() => setMessageDetails(null)}>
+                <section className="message-detail-card" onClick={(event) => event.stopPropagation()}>
+                  <button className="message-detail-close" onClick={() => setMessageDetails(null)}>×</button>
+                  <span className="message-detail-icon">✓✓</span>
+                  <h3>Message details</h3>
+                  <p>{messageDetails.content || messageDetails.attachmentName || "Attachment"}</p>
+                  <dl>
+                    <div><dt>Sent</dt><dd>{formatMessageDateTime(messageDetails.sentAt)}</dd></div>
+                    <div><dt>Received</dt><dd>{formatMessageDateTime(messageDetails.sentAt)}</dd></div>
+                    <div><dt>Read</dt><dd>{messageDetails.readAt ? formatMessageDateTime(messageDetails.readAt) : "Not read yet"}</dd></div>
+                  </dl>
+                </section>
+              </div>
+            )}
           </section>
         )}
         {view === "profile" && (
@@ -497,7 +549,12 @@ export default function Dashboard() {
             </label>
             <label>
               Status
-              <input name="status" defaultValue={me.status || "Available"} />
+              <select name="status" defaultValue={me.status || "Available"}>
+                <option value="Available">Available</option>
+                <option value="Busy">Busy</option>
+                <option value="Away">Away</option>
+                <option value="Do Not Disturb">Do Not Disturb</option>
+              </select>
             </label>
             <label>
               Bio
@@ -517,7 +574,7 @@ export default function Dashboard() {
             <div className="swatches">
               {["violet", "ocean", "coral", "forest"].map((x) => (
                 <button
-                  className={theme === x ? "active" : ""}
+                  className={`theme-choice tone-${x} ${theme === x ? "active" : ""}`}
                   onClick={() => setTheme(x)}
                   key={x}
                 >
@@ -531,6 +588,29 @@ export default function Dashboard() {
               <div><strong>{darkMode ? "Use light mode" : "Use dark mode"}</strong><small>Switch the complete dashboard appearance.</small></div>
               <i className={darkMode ? "enabled" : ""} />
             </button>
+            <div className="pointer-settings">
+              <h3>Pointer style</h3>
+              <p>Choose an effect that follows your mouse.</p>
+              <div className="pointer-options">
+                {[
+                  ["default", "↖", "Default"],
+                  ["meteor", "☄", "Meteor tail"],
+                  ["sparkles", "✦", "Sparkles"],
+                  ["glow", "●", "Soft glow"],
+                ].map(([value, icon, label]) => (
+                  <button
+                    type="button"
+                    className={pointerEffect === value ? "active" : ""}
+                    onClick={() => setPointerEffect(value)}
+                    key={value}
+                  >
+                    <i className={`pointer-preview ${value}`}>{icon}</i>
+                    <span>{label}</span>
+                    {pointerEffect === value && <b>✓</b>}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="background-settings">
               <h3>Chat background</h3>
               <p>Choose a built-in style or use your own image.</p>
@@ -573,6 +653,36 @@ function Avatar({ name }: { name: string }) {
         .toUpperCase()}
     </div>
   );
+}
+
+function chatDateLabel(date: Date) {
+  const today = new Date(),
+    yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  const daysAgo = Math.floor((new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() - new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()) / 86400000);
+  if (daysAgo > 1 && daysAgo < 7) return date.toLocaleDateString([], { weekday: "long" });
+  return date.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
+
+function formatMessageDateTime(value: string) {
+  return new Date(value).toLocaleString([], { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function updateActivityStreak() {
+  const today = new Date(),
+    key = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`,
+    lastKey = localStorage.getItem("woven-streak-day"),
+    previous = Number(localStorage.getItem("woven-friendship-streak") || "0");
+  if (lastKey === key) return Math.max(previous, 1);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const yesterdayKey = `${yesterday.getFullYear()}-${yesterday.getMonth() + 1}-${yesterday.getDate()}`,
+    next = lastKey === yesterdayKey ? previous + 1 : 1;
+  localStorage.setItem("woven-streak-day", key);
+  localStorage.setItem("woven-friendship-streak", String(next));
+  return next;
 }
 
 function MessageAttachment({ message }: { message: Message }) {
@@ -708,6 +818,7 @@ function BoredomBreak() {
             <h4>{prompt}</h4>
             <button onClick={shufflePrompt}>Give me another <span>↻</span></button>
           </article>
+          <JumpGame />
         </div>
       </div>
     </section>

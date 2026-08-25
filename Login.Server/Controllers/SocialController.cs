@@ -73,7 +73,10 @@ public class SocialController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     public async Task<IActionResult> Profile(ProfileRequest request)
     {
         var u = await db.Users.FindAsync(UserId); if (u is null) return NotFound();
-        u.Name = request.Name.Trim(); u.Bio = request.Bio.Trim(); u.Status = request.Status.Trim();
+        var allowedStatuses = new[] { "Available", "Busy", "Away", "Do Not Disturb" };
+        var status = allowedStatuses.FirstOrDefault(x => x.Equals(request.Status?.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (status is null) return BadRequest(new { message = "Choose a valid status." });
+        u.Name = request.Name.Trim(); u.Bio = request.Bio.Trim(); u.Status = status;
         await db.SaveChangesAsync(); return Ok(new { u.Id, u.Name, u.Email, u.Bio, u.Status });
     }
     public record ProfileRequest(string Name, string Bio, string Status);
