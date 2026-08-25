@@ -3,13 +3,14 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Landing from "./pages/Landing";
 
 function App() {
     return (
         <Routes>
             <Route
                 path="/"
-                element={<Navigate to="/login" replace />}
+                element={<Landing />}
             />
 
             <Route
@@ -31,7 +32,7 @@ function App() {
 
             <Route
                 path="*"
-                element={<Navigate to="/login" replace />}
+                element={<Navigate to="/" replace />}
             />
         </Routes>
     );

@@ -131,6 +131,8 @@ public class AuthController : ControllerBase
                 user.Id,
                 user.Name,
                 user.Email,
+                user.Bio,
+                user.Status,
                 user.CreatedAt
             })
             .FirstOrDefaultAsync();

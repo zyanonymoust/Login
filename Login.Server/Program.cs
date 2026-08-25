@@ -1,5 +1,6 @@
 using Login.Server.Data;
 using Login.Server.Services;
+using Login.Server.Hubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -17,6 +18,7 @@ var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("JWT Key is missing.");
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 
 builder.Services.AddOpenApi();
 
@@ -54,6 +56,16 @@ builder.Services
 
                 ClockSkew = TimeSpan.Zero
             };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var token = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(token) && context.HttpContext.Request.Path.StartsWithSegments("/hubs/chat"))
+                    context.Token = token;
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -83,6 +95,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
 
 if (!app.Environment.IsEnvironment("Testing"))
 {

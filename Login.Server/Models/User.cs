@@ -22,6 +22,14 @@ public class User
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    [MaxLength(160)]
+    public string Bio { get; set; } = string.Empty;
+
+    [MaxLength(40)]
+    public string Status { get; set; } = "Available";
+
+    public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
+
     [JsonIgnore]
     public List<TaskItem> Tasks { get; set; } = [];
 }
