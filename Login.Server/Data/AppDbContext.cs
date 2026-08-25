@@ -13,6 +13,9 @@ public class AppDbContext : DbContext
     public DbSet<TaskItem> Tasks { get; set; }
     public DbSet<Friendship> Friendships { get; set; }
     public DbSet<ChatMessage> Messages { get; set; }
+    public DbSet<GroupRoom> GroupRooms { get; set; }
+    public DbSet<GroupMember> GroupMembers { get; set; }
+    public DbSet<GroupChatMessage> GroupMessages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -61,6 +64,24 @@ public class AppDbContext : DbContext
             entity.Property(x => x.AttachmentContentType).HasMaxLength(120);
             entity.HasOne(x => x.Sender).WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Recipient).WithMany().HasForeignKey(x => x.RecipientId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<GroupRoom>(entity =>
+        {
+            entity.HasKey(x => x.Id); entity.Property(x => x.Name).HasMaxLength(100).IsRequired(); entity.Property(x => x.Description).HasMaxLength(500).IsRequired();
+            entity.HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedById).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<GroupMember>(entity =>
+        {
+            entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.GroupRoomId, x.UserId }).IsUnique();
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired(); entity.Property(x => x.Role).HasMaxLength(20).IsRequired();
+            entity.HasOne(x => x.GroupRoom).WithMany(x => x.Members).HasForeignKey(x => x.GroupRoomId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<GroupChatMessage>(entity =>
+        {
+            entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.GroupRoomId, x.SentAt }); entity.Property(x => x.Content).HasMaxLength(4000).IsRequired();
+            entity.HasOne(x => x.GroupRoom).WithMany(x => x.Messages).HasForeignKey(x => x.GroupRoomId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Sender).WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

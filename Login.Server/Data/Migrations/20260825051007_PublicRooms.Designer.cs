@@ -3,6 +3,7 @@ using System;
 using Login.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Login.Server.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260825051007_PublicRooms")]
+    partial class PublicRooms
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -138,17 +141,11 @@ namespace Login.Server.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<bool>("DoNotDisturb")
-                        .HasColumnType("boolean");
-
                     b.Property<int>("GroupRoomId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("InvitedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsMuted")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -186,11 +183,6 @@ namespace Login.Server.Data.Migrations
 
                     b.Property<int>("CreatedById")
                         .HasColumnType("integer");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsPublic")
                         .HasColumnType("boolean");

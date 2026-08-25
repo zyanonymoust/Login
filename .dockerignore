@@ -1,6 +1,6 @@
 **/bin
 **/obj
-**/node_modoules
+**/node_modules
 **/dist
 **/.vs
 **/test-results

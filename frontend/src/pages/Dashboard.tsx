@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 import { API_BASE_URL, apiRequest } from "../services/api";
 import { logout } from "../services/auth";
 import JumpGame from "../components/JumpGame";
+import GroupSpace from "../components/GroupSpace";
 import "./social.css";
 type Person = {
   id: number;
@@ -36,6 +37,7 @@ type Me = {
   bio?: string;
   status?: string;
 };
+export type GroupRoom = { id:number; name:string; description:string; isPublic:boolean; status:string; role:string; isMuted:boolean; doNotDisturb:boolean; memberCount:number; invitedBy:string; createdAt:string };
 export default function Dashboard() {
   const fileInput = useRef<HTMLInputElement>(null);
   const nav = useNavigate(),
@@ -47,7 +49,8 @@ export default function Dashboard() {
     [messages, setMessages] = useState<Message[]>([]),
     [draft, setDraft] = useState(""),
     [uploading, setUploading] = useState(false),
-    [view, setView] = useState<"chat" | "home" | "profile" | "settings">(
+    [groupRooms, setGroupRooms] = useState<GroupRoom[]>([]),
+    [view, setView] = useState<"chat" | "home" | "groups" | "profile" | "settings">(
       "home",
     ),
     [query, setQuery] = useState(""),
@@ -68,18 +71,21 @@ export default function Dashboard() {
       setSelected((s) => (s ? d.find((x) => x.id === s.id) || null : s));
     } catch {}
   }, []);
+  const refreshGroups = useCallback(async () => {
+    try { setGroupRooms(await apiRequest<GroupRoom[]>("/api/groups")); } catch { /* signed-out transition */ }
+  }, []);
   useEffect(() => {
     apiRequest<Me>("/api/auth/me")
       .then(setMe)
       .catch(() => {});
-    refresh();
+    refresh(); refreshGroups();
     apiRequest("/api/social/heartbeat", { method: "POST" }).catch(() => {});
     const t = setInterval(() => {
       refresh();
       apiRequest("/api/social/heartbeat", { method: "POST" }).catch(() => {});
     }, 15000);
     return () => clearInterval(t);
-  }, [refresh]);
+  }, [refresh, refreshGroups]);
   useEffect(() => {
     if (!selected) return;
     let a = true;
@@ -131,16 +137,19 @@ export default function Dashboard() {
     c.on("PresenceChanged", refresh);
     c.on("FriendRequestReceived", refresh);
     c.on("FriendRequestUpdated", refresh);
+    c.on("GroupInviteReceived", refreshGroups);
+    c.on("GroupMembershipChanged", refreshGroups);
     c.start().catch(() => {});
     return () => {
       c.stop().catch(() => {});
     };
-  }, [selected, refresh]);
+  }, [selected, refresh, refreshGroups]);
   const friends = people.filter((x) => x.friendshipStatus === "accepted"),
     others = people.filter((x) => x.friendshipStatus !== "accepted"),
     incomingRequests = people.filter((x) => x.friendshipStatus === "pending" && x.incoming),
+    pendingGroups = groupRooms.filter((x) => x.status === "pending"),
     unread = people.reduce((a, x) => a + x.unread, 0),
-    notificationCount = unread + incomingRequests.length,
+    notificationCount = unread + incomingRequests.length + pendingGroups.length,
     choose = (p: Person) => {
       setSelected(p);
       setView("chat");
@@ -157,6 +166,8 @@ export default function Dashboard() {
       await apiRequest(`/api/social/friends/${p.id}`, { method: "DELETE" });
       await refresh();
     },
+    acceptGroup = async (room: GroupRoom) => { await apiRequest(`/api/groups/${room.id}/accept`, { method: "POST" }); await refreshGroups(); },
+    declineGroup = async (room: GroupRoom) => { await apiRequest(`/api/groups/${room.id}/invite`, { method: "DELETE" }); await refreshGroups(); },
     send = async (e: FormEvent) => {
       e.preventDefault();
       if (!selected || !draft.trim()) return;
@@ -243,6 +254,9 @@ export default function Dashboard() {
             💬<span>Messages</span>
             {unread > 0 && <b>{unread}</b>}
           </button>
+          <button className={view === "groups" ? "active" : ""} onClick={() => setView("groups")}>
+            👥<span>Rooms</span>{pendingGroups.length > 0 && <b>{pendingGroups.length}</b>}
+          </button>
         </nav>
         <div className="side-bottom">
           <button onClick={() => setDarkMode((value) => !value)} title="Toggle dark mode">
@@ -314,6 +328,8 @@ export default function Dashboard() {
                   ? "Edit profile"
                   : view === "settings"
                     ? "Appearance"
+                    : view === "groups"
+                      ? "Rooms & meetings"
                     : "Good day, " + (me.name?.split(" ")[0] || "friend")}
             </h2>
           </div>
@@ -330,6 +346,12 @@ export default function Dashboard() {
                     <Avatar name={x.name} />
                     <span><strong>{x.name}</strong><small>wants to be your friend</small></span>
                     <div><button onClick={() => acceptFriend(x)}>Accept</button><button className="decline" onClick={() => declineFriend(x)}>Decline</button></div>
+                  </div>
+                ))}
+                {pendingGroups.map((room) => (
+                  <div className="friend-notice group-invite-notice" key={`group-${room.id}`}>
+                    <div className="avatar">👥</div><span><strong>{room.name}</strong><small>{room.invitedBy} invited you to join</small></span>
+                    <div><button onClick={() => acceptGroup(room)}>Accept</button><button className="decline" onClick={() => declineGroup(room)}>Decline</button></div>
                   </div>
                 ))}
                 {people.filter((x) => x.unread).map((x) => (
@@ -388,6 +410,7 @@ export default function Dashboard() {
             <div className="jump-game-wrap"><JumpGame /></div>
           </section>
         )}
+        {view === "groups" && <GroupSpace rooms={groupRooms} people={people} me={me} onRoomsChanged={refreshGroups} />}
         {view === "chat" && selected && (
           <section
             className={`chat-view bg-${chatBg.startsWith("data:") ? "custom" : chatBg}`}
