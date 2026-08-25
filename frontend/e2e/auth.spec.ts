@@ -18,7 +18,7 @@ async function register(
 
     await expect(
         page.getByRole("heading", {
-            name: "Create Account"
+            name: "Join Woven"
         })
     ).toBeVisible();
 
@@ -42,7 +42,7 @@ async function register(
 
     await page
         .getByRole("button", {
-            name: "Create Account"
+            name: "Create my account"
         })
         .click();
 }
@@ -64,7 +64,7 @@ test("dashboard requires login", async ({ page }) => {
 
     await expect(
         page.getByRole("heading", {
-            name: "Login"
+            name: "Welcome back"
         })
     ).toBeVisible();
 });
@@ -82,7 +82,7 @@ test("wrong login is rejected", async ({ page }) => {
 
     await page
         .getByRole("button", {
-            name: "Login"
+            name: "Sign in to Woven"
         })
         .click();
 
@@ -118,7 +118,7 @@ test("register login dark mode and logout", async ({
 
     await page
         .getByRole("button", {
-            name: "Login"
+            name: "Sign in to Woven"
         })
         .click();
 
@@ -126,27 +126,27 @@ test("register login dark mode and logout", async ({
 
     await expect(
         page.getByRole("heading", {
-            name: /Hello, Playwright User/
+            name: /Good day, Playwright/
         })
     ).toBeVisible();
 
     await page
         .getByRole("button", {
-            name: /Dark/
+            name: "Toggle dark mode"
         })
         .click();
 
     await expect(
-        page.locator(".dashboard-page")
+        page.locator(".woven-app")
     ).toHaveClass(/dark/);
 
     await page
         .getByRole("button", {
-            name: "Logout"
+            name: "Sign out"
         })
         .click();
 
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/$/);
 
     const token = await page.evaluate(() =>
         localStorage.getItem("token")
@@ -186,7 +186,7 @@ test("duplicate email is rejected", async ({ page }) => {
 
     await page
         .getByRole("button", {
-            name: "Create Account"
+            name: "Create my account"
         })
         .click();
 

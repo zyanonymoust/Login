@@ -270,33 +270,36 @@ export default function Dashboard() {
         </button>
         <nav>
           <button
+            aria-label="Home"
             className={view === "home" ? "active" : ""}
             onClick={() => setView("home")}
           >
             ⌂<span>Home</span>
           </button>
           <button
+            aria-label="Messages"
             className={view === "chat" ? "active" : ""}
             onClick={() => selected && setView("chat")}
           >
             💬<span>Messages</span>
             {unread > 0 && <b>{unread}</b>}
           </button>
-          <button className={view === "groups" ? "active" : ""} onClick={() => setView("groups")}>
+          <button aria-label="Groups" className={view === "groups" ? "active" : ""} onClick={() => setView("groups")}>
             👥<span>Groups</span>{pendingGroups.length > 0 && <b>{pendingGroups.length}</b>}
           </button>
         </nav>
         <div className="side-bottom">
-          <button onClick={() => setDarkMode((value) => !value)} title="Toggle dark mode">
+          <button aria-label="Toggle dark mode" onClick={() => setDarkMode((value) => !value)} title="Toggle dark mode">
             {darkMode ? "☀" : "☾"}<span>Dark mode</span>
           </button>
-          <button onClick={() => setView("profile")}>
+          <button aria-label="Profile" onClick={() => setView("profile")}>
             ♙<span>Profile</span>
           </button>
-          <button onClick={() => setView("settings")}>
+          <button aria-label="Settings" onClick={() => setView("settings")}>
             ⚙<span>Settings</span>
           </button>
           <button
+            aria-label="Sign out"
             onClick={() => {
               logout();
               nav("/");
