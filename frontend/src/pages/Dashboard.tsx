@@ -39,7 +39,9 @@ type Me = {
 };
 export type GroupRoom = { id:number; name:string; description:string; isPublic:boolean; status:string; role:string; isMuted:boolean; doNotDisturb:boolean; memberCount:number; invitedBy:string; createdAt:string };
 export default function Dashboard() {
-  const fileInput = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null),
+    messageListRef = useRef<HTMLDivElement>(null),
+    followLatest = useRef(true);
   const nav = useNavigate(),
     [me, setMe] = useState<Me>(() =>
       JSON.parse(localStorage.getItem("user") || "{}"),
@@ -50,6 +52,7 @@ export default function Dashboard() {
     [messageDetails, setMessageDetails] = useState<Message | null>(null),
     [draft, setDraft] = useState(""),
     [uploading, setUploading] = useState(false),
+    [showLatest, setShowLatest] = useState(false),
     [groupRooms, setGroupRooms] = useState<GroupRoom[]>([]),
     [view, setView] = useState<"chat" | "home" | "groups" | "profile" | "settings">(
       "home",
@@ -69,6 +72,13 @@ export default function Dashboard() {
       () => localStorage.getItem("woven-pointer-effect") || "default",
     ),
     [friendshipStreak] = useState(updateActivityStreak);
+  const scrollToLatest = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const list = messageListRef.current;
+    if (!list) return;
+    followLatest.current = true;
+    setShowLatest(false);
+    list.scrollTo({ top: list.scrollHeight, behavior });
+  }, []);
   const refresh = useCallback(async () => {
     try {
       const d = await apiRequest<Person[]>("/api/social/people");
@@ -96,6 +106,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (!selected) return;
     let a = true;
+    followLatest.current = true;
+    setShowLatest(false);
     apiRequest<Message[]>(`/api/messages/${selected.id}`)
       .then((d) => a && setMessages(d))
       .catch(() => {});
@@ -103,6 +115,11 @@ export default function Dashboard() {
       a = false;
     };
   }, [selected]);
+  useEffect(() => {
+    if (!followLatest.current) return;
+    const frame = window.requestAnimationFrame(() => scrollToLatest("smooth"));
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages, scrollToLatest]);
   useEffect(() => localStorage.setItem("woven-theme", theme), [theme]);
   useEffect(() => localStorage.setItem("woven-dark", darkMode ? "on" : "off"), [darkMode]);
   useEffect(() => localStorage.setItem("woven-chat-bg", chatBg), [chatBg]);
@@ -200,12 +217,14 @@ export default function Dashboard() {
       e.preventDefault();
       if (!selected || !draft.trim()) return;
       const content = draft;
+      followLatest.current = true;
       setDraft("");
       await apiRequest(`/api/messages/${selected.id}`, {
         method: "POST",
         body: JSON.stringify({ content }),
       });
       setMessages(await apiRequest<Message[]>(`/api/messages/${selected.id}`));
+      window.requestAnimationFrame(() => scrollToLatest());
     },
     save = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -242,6 +261,7 @@ export default function Dashboard() {
         return;
       }
       setUploading(true);
+      followLatest.current = true;
       try {
         const body = new FormData();
         body.append("file", file);
@@ -417,26 +437,31 @@ export default function Dashboard() {
                 <div className="friendship-streak"><span>🔥</span><strong>{friendshipStreak} day{friendshipStreak === 1 ? "" : "s"}</strong><small>Friendship streak</small></div>
               </div>
             </div>
-            <div className="quick-heading">
-              <h3>Jump back in</h3>
-            </div>
-            <div className="quick-grid">
-              {friends.slice(0, 3).map((p) => (
-                <button key={p.id} onClick={() => choose(p)}>
-                  <Avatar name={p.name} />
-                  <span>
-                    <strong>{p.name}</strong>
-                    <small>{p.online ? "Online now" : p.status}</small>
-                  </span>
-                  <b>→</b>
-                </button>
-              ))}
-              {!friends.length && (
-                <div className="empty-card">
-                  <b>Your circle starts here</b>
-                  <span>Add someone from Public to begin a conversation.</span>
+            <div className="quick-section">
+              <div className="quick-conversations">
+                <div className="quick-heading">
+                  <h3>Jump back in</h3>
                 </div>
-              )}
+                <div className="quick-grid">
+                  {friends.slice(0, 3).map((p) => (
+                    <button key={p.id} onClick={() => choose(p)}>
+                      <Avatar name={p.name} />
+                      <span>
+                        <strong>{p.name}</strong>
+                        <small>{p.online ? "Online now" : p.status}</small>
+                      </span>
+                      <b>→</b>
+                    </button>
+                  ))}
+                  {!friends.length && (
+                    <div className="empty-card">
+                      <b>Your circle starts here</b>
+                      <span>Add someone from Public to begin a conversation.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <FriendshipSpark />
             </div>
             <BoredomBreak />
           </section>
@@ -472,7 +497,16 @@ export default function Dashboard() {
                 {selected.friendshipStatus === "pending" && !selected.incoming ? <button disabled>Request sent</button> : selected.incoming ? <div><button onClick={() => acceptFriend(selected)}>Accept</button><button className="decline" onClick={() => declineFriend(selected)}>Decline</button></div> : <button onClick={() => add(selected)}>Add friend</button>}
               </div>
             )}
-            <div className="message-list">
+            <div
+              className="message-list"
+              ref={messageListRef}
+              onScroll={(event) => {
+                const list = event.currentTarget,
+                  isNearLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 90;
+                followLatest.current = isNearLatest;
+                setShowLatest(!isNearLatest);
+              }}
+            >
               {!messages.length && (
                 <div className="start-chat">
                   <Avatar name={selected.name} />
@@ -510,6 +544,11 @@ export default function Dashboard() {
                 );
               })}
             </div>
+            {showLatest && (
+              <button className="latest-message-button" onClick={() => scrollToLatest()} aria-label="Go to latest message">
+                ↓<span>Latest</span>
+              </button>
+            )}
             <form className="composer" onSubmit={send}>
               <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading} title="Add image or file">{uploading ? "…" : "＋"}</button>
               <input ref={fileInput} className="attachment-input" type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onChange={sendAttachment} />
@@ -689,7 +728,8 @@ function updateActivityStreak() {
 }
 
 function MessageAttachment({ message }: { message: Message }) {
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(""),
+    [previewing, setPreviewing] = useState(false);
   useEffect(() => {
     let objectUrl = "";
     fetch(`${API_BASE_URL}${message.attachmentUrl}`, {
@@ -709,7 +749,16 @@ function MessageAttachment({ message }: { message: Message }) {
 
   const image = message.attachmentContentType?.startsWith("image/");
   if (!url) return <div className="attachment-loading">Loading attachment…</div>;
-  if (image) return <a className="image-attachment" href={url} download={message.attachmentName}><img src={url} alt={message.attachmentName || "Shared image"} /><span>{message.attachmentName}</span></a>;
+  if (image) return <>
+    <button className="image-attachment" type="button" onClick={() => setPreviewing(true)}><img src={url} alt={message.attachmentName || "Shared image"} /><span>{message.attachmentName}</span></button>
+    {previewing && <div className="image-preview-backdrop" onClick={() => setPreviewing(false)}>
+      <section className="image-preview-card" onClick={(event) => event.stopPropagation()}>
+        <button className="image-preview-close" onClick={() => setPreviewing(false)}>×</button>
+        <img src={url} alt={message.attachmentName || "Shared image"} />
+        <footer><span>{message.attachmentName}</span><a href={url} download={message.attachmentName}>Download</a></footer>
+      </section>
+    </div>}
+  </>;
   return <a className="file-attachment" href={url} download={message.attachmentName}><b>📎</b><span><strong>{message.attachmentName}</strong><small>Click to download</small></span></a>;
 }
 
@@ -724,7 +773,6 @@ const conversationPrompts = [
 function BoredomBreak() {
   const timer = useRef<number | null>(null);
   const startedAt = useRef(0);
-  const [prompt, setPrompt] = useState(conversationPrompts[0]);
   const [reaction, setReaction] = useState<"idle" | "waiting" | "ready" | "finished" | "early">("idle");
   const [reactionTime, setReactionTime] = useState<number | null>(null);
   const [bestReaction, setBestReaction] = useState<number | null>(null);
@@ -737,11 +785,6 @@ function BoredomBreak() {
   useEffect(() => () => {
     if (timer.current) window.clearTimeout(timer.current);
   }, []);
-
-  const shufflePrompt = () => {
-    const choices = conversationPrompts.filter((item) => item !== prompt);
-    setPrompt(choices[Math.floor(Math.random() * choices.length)]);
-  };
 
   const startReaction = () => {
     if (timer.current !== null) window.clearTimeout(timer.current);
@@ -815,16 +858,26 @@ function BoredomBreak() {
           {reaction === "early" && <div className="reaction-result early"><strong>Too early!</strong><span>Wait until the area turns green.</span><button onClick={startReaction}>Try Again</button></div>}
           {reaction === "finished" && <div className="reaction-result finished"><strong>{reactionTime} ms</strong><span>{reactionRating}</span><button onClick={startReaction}>Play Again</button></div>}
         </article>
-          <article className="prompt-card">
-            <div className="activity-icon">✦</div>
-            <small>FRIENDSHIP SPARK</small>
-            <h4>{prompt}</h4>
-            <button onClick={shufflePrompt}>Give me another <span>↻</span></button>
-          </article>
           <JumpGame />
         </div>
       </div>
     </section>
+  );
+}
+
+function FriendshipSpark() {
+  const [prompt, setPrompt] = useState(conversationPrompts[0]);
+  const shufflePrompt = () => {
+    const choices = conversationPrompts.filter((item) => item !== prompt);
+    setPrompt(choices[Math.floor(Math.random() * choices.length)]);
+  };
+  return (
+    <article className="friendship-spark-card">
+      <div className="activity-icon">✦</div>
+      <small>FRIENDSHIP SPARK</small>
+      <h4>{prompt}</h4>
+      <button onClick={shufflePrompt}>Give me another <span>↻</span></button>
+    </article>
   );
 }
 function Group({

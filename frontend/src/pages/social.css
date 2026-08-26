@@ -584,6 +584,14 @@
 }
 .quick-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-top: 27px; }
 .quick-heading h3 { margin: 0; }
+.quick-section { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr); gap: 18px; align-items: stretch; margin-top: 27px; }
+.quick-section .quick-heading { margin-top: 0; margin-bottom: 16px; }
+.quick-section .quick-grid { grid-template-columns: 1fr; }
+.friendship-spark-card { min-height: 190px; display: flex; flex-direction: column; justify-content: center; padding: 26px; border: 1px solid var(--line); border-radius: 18px; background: white; box-shadow: 0 10px 30px #211d310b; }
+.friendship-spark-card > small { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: 1.1px; }
+.friendship-spark-card h4 { margin: 9px 0 18px; font: 700 17px/1.45 Manrope; }
+.friendship-spark-card button { align-self: flex-start; min-height: 39px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: white; font-weight: 700; cursor: pointer; }
+.friendship-spark-card button span { margin-left: 8px; color: var(--accent); }
 .friendship-streak { display: grid; grid-template-columns: auto auto; column-gap: 8px; align-items: center; padding: 9px 13px; border: 1px solid #f1b95455; border-radius: 13px; background: linear-gradient(135deg, #fff8e8, #fff); }
 .friendship-streak > span { grid-row: 1 / 3; font-size: 22px; }
 .friendship-streak strong { font-size: 12px; }
@@ -666,7 +674,12 @@
   padding: 35px 8%;
   display: flex;
   flex-direction: column;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 68%, #8d87a0) transparent;
 }
+.message-list::-webkit-scrollbar { width: 9px; }
+.message-list::-webkit-scrollbar-track { background: transparent; }
+.message-list::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: color-mix(in srgb, var(--accent) 62%, #8d87a0); background-clip: padding-box; }
 .message {
   flex: 0 0 auto;
   align-self: flex-start;
@@ -748,7 +761,7 @@
 }
 .composer .attachment-input { display: none; }
 .composer button:disabled { cursor: wait; opacity: .65; }
-.image-attachment { display: block; max-width: 320px; margin-top: 7px; overflow: hidden; border-radius: 13px; color: inherit; text-decoration: none; background: #0000000c; }
+.image-attachment { display: block; max-width: 320px; margin-top: 7px; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; color: inherit; text-align: left; background: #0000000c; cursor: zoom-in; }
 .image-attachment img { display: block; width: 100%; max-height: 300px; object-fit: cover; }
 .image-attachment span { display: block; padding: 7px 10px; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .file-attachment { display: flex; min-width: 230px; align-items: center; gap: 10px; margin-top: 7px; padding: 11px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: color-mix(in srgb, var(--soft) 88%, transparent); text-decoration: none; }
@@ -757,6 +770,15 @@
 .file-attachment strong { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-attachment small, .attachment-loading { color: var(--muted); font-size: 10px; }
 .attachment-loading { padding: 9px 0; }
+.latest-message-button { position: absolute !important; z-index: 5 !important; right: 28px; bottom: 82px; display: flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 13px; border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--line)); border-radius: 99px; color: white; background: var(--accent); box-shadow: 0 9px 28px #0004; font-weight: 800; cursor: pointer; animation: latest-arrive .2s ease-out; }
+.latest-message-button span { font-size: 11px; }
+.image-preview-backdrop { position: fixed !important; z-index: 1100 !important; inset: 0; display: grid; place-items: center; padding: 30px; background: #050711dd; backdrop-filter: blur(10px); }
+.image-preview-card { position: relative; width: min(920px, 94vw); max-height: 90vh; overflow: hidden; border: 1px solid #ffffff24; border-radius: 20px; background: #111626; box-shadow: 0 30px 100px #0009; }
+.image-preview-card > img { display: block; width: 100%; max-height: calc(90vh - 66px); object-fit: contain; background: #080b13; }
+.image-preview-card footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 17px; color: #e9e6f2; }
+.image-preview-card footer span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.image-preview-card footer a { flex: none; padding: 8px 12px; border-radius: 9px; color: white; background: var(--accent); text-decoration: none; font-weight: 800; }
+.image-preview-close { position: absolute; z-index: 2; top: 12px; right: 12px; width: 36px; height: 36px; border: 1px solid #ffffff33; border-radius: 10px; color: white; background: #090c16bb; font-size: 22px; cursor: pointer; }
 .composer button {
   width: 44px;
   height: 44px;
@@ -952,8 +974,11 @@
 .woven-app.dark .chat-view::before { position: absolute; z-index: 0; inset: 0; pointer-events: none; content: ""; background: linear-gradient(145deg, rgba(6, 9, 18, .76), rgba(12, 15, 29, .68)); }
 .woven-app.dark .chat-view.bg-default::before { background: rgba(5, 8, 16, .34); }
 .woven-app.dark .quick-grid > button, .woven-app.dark .empty-card, .woven-app.dark .break-grid article, .woven-app.dark .break-grid button, .woven-app.dark .notice-pop, .woven-app.dark .message p, .woven-app.dark .background-options button, .woven-app.dark .background-options label { background-color: #24202f; color: var(--ink); }
+.woven-app.dark .friendship-spark-card, .woven-app.dark .friendship-spark-card button { color: var(--ink); background: #24202f; }
 .woven-app.dark .message:not(.mine) p { background: #222a42; border-color: #37415f; box-shadow: 0 7px 22px #0004; }
 .woven-app.dark .message.mine p { color: #fff; border-color: color-mix(in srgb, var(--accent) 75%, white); background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 82%, white), var(--accent)); box-shadow: 0 7px 22px color-mix(in srgb, var(--accent) 28%, transparent); }
+.woven-app.dark .image-attachment, .woven-app.dark .file-attachment { color: var(--ink); border-color: #414967; background: #171d30; }
+.woven-app.dark .attachment-loading { color: #b7b2c7; }
 .woven-app.dark .search, .woven-app.dark .my-card { background: #272231; }
 .woven-app.dark .person-main,
 .woven-app.dark .person-main strong,
@@ -988,6 +1013,7 @@
 @keyframes meteor-tail { from { opacity: .95; transform: translate(-15%, -50%) rotate(-20deg) scaleX(1); } to { opacity: 0; transform: translate(-130%, 90%) rotate(-20deg) scaleX(.2); } }
 @keyframes sparkle-pop { from { opacity: 1; transform: translate(-50%, -50%) scale(.3) rotate(0); } to { opacity: 0; transform: translate(-50%, -120%) scale(1.3) rotate(80deg); } }
 @keyframes glow-fade { from { opacity: .8; transform: translate(-50%, -50%) scale(1); } to { opacity: 0; transform: translate(-50%, -50%) scale(.2); } }
+@keyframes latest-arrive { from { opacity: 0; transform: translateY(8px); } }
 @media (prefers-reduced-motion: reduce) { .woven-app.dark::before { animation: none; } .pointer-particle { display: none; } }
 @keyframes reaction-ready { to { transform: scale(1.015); box-shadow: 0 0 24px #39b97855; } }
 @media (max-width: 850px) {
@@ -1004,6 +1030,7 @@
   .quick-grid {
     grid-template-columns: 1fr;
   }
+  .quick-section { grid-template-columns: 1fr; }
   .break-grid { grid-template-columns: 1fr; }
   .product-preview {
     grid-template-columns: 65px 240px 1fr;
@@ -1094,6 +1121,8 @@
   .message {
     max-width: 85%;
   }
+  .latest-message-button { right: 16px; bottom: 78px; }
+  .latest-message-button span { display: none; }
   .settings-view {
     margin: 20px;
   }
