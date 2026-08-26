@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { SubmitEvent } from "react";
 import { HubConnection, HubConnectionBuilder } from "@microsoft/signalr";
 import { apiRequest } from "../services/api";
 import type { GroupRoom } from "../pages/Dashboard";
@@ -45,6 +45,10 @@ export default function GroupSpace({
     [newDescription, setNewDescription] = useState(""),
     [isPublic, setIsPublic] = useState(true),
     [showCreate, setShowCreate] = useState(false),
+    [showDetails, setShowDetails] = useState(false),
+    [detailName, setDetailName] = useState(""),
+    [detailDescription, setDetailDescription] = useState(""),
+    [savingDetails, setSavingDetails] = useState(false),
     [connection, setConnection] = useState<HubConnection | null>(null),
     [meeting, setMeeting] = useState(false);
   const accepted = rooms.filter((x) => x.status === "accepted"),
@@ -90,7 +94,7 @@ export default function GroupSpace({
     apiRequest<Member[]>(`/api/groups/${active.id}/members`).then(setMembers);
     connection?.invoke("JoinRoom", active.id).catch(() => {});
   }, [active, connection]);
-  const create = async (e: FormEvent) => {
+  const create = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!newName.trim()) return;
       const room = await apiRequest<GroupRoom>("/api/groups", {
@@ -103,7 +107,7 @@ export default function GroupSpace({
       await onRoomsChanged();
       setActive(room);
     },
-    send = async (e: FormEvent) => {
+    send = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!active || !draft.trim()) return;
       const content = draft;
@@ -158,11 +162,23 @@ export default function GroupSpace({
       if (!active) return; await apiRequest(`/api/groups/${active.id}/members/${member.userId}/mute`, { method: "POST", body: JSON.stringify({ muted: !member.isMuted }) });
       setMembers((items) => items.map((x) => x.userId === member.userId ? { ...x, isMuted: !x.isMuted } : x));
     },
-    editDetails = async () => {
-      if (!active) return; const name = window.prompt("Group name", active.name); if (!name) return;
-      const description = window.prompt("Group description", active.description || "") ?? active.description;
-      await apiRequest(`/api/groups/${active.id}/details`, { method: "PUT", body: JSON.stringify({ name, description }) });
-      setActive({ ...active, name, description }); onRoomsChanged();
+    openDetails = () => {
+      if (!active) return;
+      setDetailName(active.name);
+      setDetailDescription(active.description || "");
+      setShowDetails(true);
+    },
+    saveDetails = async (e: SubmitEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (!active || !detailName.trim()) return;
+      setSavingDetails(true);
+      try {
+        await apiRequest(`/api/groups/${active.id}/details`, { method: "PUT", body: JSON.stringify({ name: detailName, description: detailDescription }) });
+        setActive({ ...active, name: detailName.trim(), description: detailDescription.trim() });
+        await onRoomsChanged();
+      } finally {
+        setSavingDetails(false);
+      }
     };
   return (
     <section className="group-space">
@@ -240,7 +256,7 @@ export default function GroupSpace({
               </div>
               <div className="room-actions">
                 <button onClick={setDnd}>{active.doNotDisturb ? "🔕 DND on" : "🔔 DND"}</button>
-                {active.role === "owner" && <button onClick={editDetails}>✎ Details</button>}
+                {active.role === "owner" && <button onClick={openDetails}>✎ Details</button>}
                 {active.role !== "owner" && <button className="leave-room" onClick={leaveRoom}>Leave</button>}
                 <button className="meeting-launch" onClick={() => setMeeting(true)}>◉ Start meeting</button>
               </div>
@@ -307,6 +323,34 @@ export default function GroupSpace({
                 me={me}
                 close={() => setMeeting(false)}
               />
+            )}
+            {showDetails && active.role === "owner" && (
+              <div className="group-details-backdrop" onClick={() => setShowDetails(false)}>
+                <section className="group-details-modal" onClick={(event) => event.stopPropagation()}>
+                  <header>
+                    <div><small>OWNER CONTROLS</small><h2>Group details</h2><p>Manage information and member permissions.</p></div>
+                    <button onClick={() => setShowDetails(false)}>×</button>
+                  </header>
+                  <form onSubmit={saveDetails}>
+                    <label>Group name<input value={detailName} onChange={(event) => setDetailName(event.target.value)} minLength={2} maxLength={100} required /></label>
+                    <label>Description<textarea value={detailDescription} onChange={(event) => setDetailDescription(event.target.value)} maxLength={500} placeholder="What is this group about?" /></label>
+                    <div className="group-visibility"><span>{active.isPublic ? "🌐" : "🔒"}</span><div><strong>{active.isPublic ? "Public group" : "Private group"}</strong><small>{active.isPublic ? "Anyone can discover and join this group." : "People must receive and accept an invitation."}</small></div></div>
+                    <button className="save-group-details" disabled={savingDetails}>{savingDetails ? "Saving…" : "Save group details"}</button>
+                  </form>
+                  <div className="permission-section">
+                    <div className="permission-heading"><div><h3>Member permissions</h3><p>{members.length} total members and invitations</p></div><span>{members.filter((member) => member.status === "accepted").length} active</span></div>
+                    <div className="permission-list">
+                      {members.map((member) => (
+                        <div className="permission-member" key={member.userId}>
+                          <i className={member.online ? "online-dot" : "offline-dot"} />
+                          <div><strong>{member.name}</strong><small>{member.email}</small><em>{member.role === "owner" ? "Owner" : member.status === "pending" ? "Invitation pending" : member.doNotDisturb ? "Do not disturb" : "Member"}</em></div>
+                          <div className="message-permission"><span><strong>{member.isMuted ? "Cannot talk" : "Can talk"}</strong><small>Send group messages</small></span>{member.role === "owner" ? <b>Owner</b> : <button type="button" className={member.isMuted ? "" : "enabled"} onClick={() => muteMember(member)} aria-label={`${member.isMuted ? "Allow" : "Mute"} ${member.name}`}><i /></button>}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              </div>
             )}
           </>
         )}

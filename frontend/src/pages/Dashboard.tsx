@@ -72,6 +72,7 @@ export default function Dashboard() {
       () => localStorage.getItem("woven-pointer-effect") || "default",
     ),
     [friendshipStreak] = useState(updateActivityStreak);
+  const selectedId = selected?.id;
   const scrollToLatest = useCallback((behavior: ScrollBehavior = "smooth") => {
     const list = messageListRef.current;
     if (!list) return;
@@ -104,20 +105,28 @@ export default function Dashboard() {
     return () => clearInterval(t);
   }, [refresh, refreshGroups]);
   useEffect(() => {
-    if (!selected) return;
+    if (!selectedId) return;
     let a = true;
     followLatest.current = true;
     setShowLatest(false);
-    apiRequest<Message[]>(`/api/messages/${selected.id}`)
+    apiRequest<Message[]>(`/api/messages/${selectedId}`)
       .then((d) => a && setMessages(d))
       .catch(() => {});
     return () => {
       a = false;
     };
-  }, [selected]);
+  }, [selectedId]);
   useEffect(() => {
-    if (!followLatest.current) return;
-    const frame = window.requestAnimationFrame(() => scrollToLatest("smooth"));
+    const frame = window.requestAnimationFrame(() => {
+      if (followLatest.current) {
+        scrollToLatest("auto");
+        return;
+      }
+      const list = messageListRef.current;
+      if (!list) return;
+      const isNearLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
+      setShowLatest(!isNearLatest);
+    });
     return () => window.cancelAnimationFrame(frame);
   }, [messages, scrollToLatest]);
   useEffect(() => localStorage.setItem("woven-theme", theme), [theme]);
@@ -156,23 +165,34 @@ export default function Dashboard() {
         .withAutomaticReconnect()
         .configureLogging(LogLevel.Warning)
         .build();
+    const keepCurrentMessagePosition = () => {
+      const list = messageListRef.current;
+      if (!list) return;
+      const isNearLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
+      if (!isNearLatest) {
+        followLatest.current = false;
+        setShowLatest(true);
+      }
+    };
     c.on("MessageReceived", (m: Message) => {
       refresh();
+      keepCurrentMessagePosition();
       if (
-        selected &&
-        (m.senderId === selected.id || m.recipientId === selected.id)
+        selectedId &&
+        (m.senderId === selectedId || m.recipientId === selectedId)
       )
         setMessages((x) => (x.some((y) => y.id === m.id) ? x : [...x, m]));
     });
     c.on("MessageSent", (m: Message) => {
+      keepCurrentMessagePosition();
       if (
-        selected &&
-        (m.senderId === selected.id || m.recipientId === selected.id)
+        selectedId &&
+        (m.senderId === selectedId || m.recipientId === selectedId)
       )
         setMessages((x) => (x.some((y) => y.id === m.id) ? x : [...x, m]));
     });
     c.on("MessagesRead", (r: { readBy: number; readAt: string }) => {
-      if (selected?.id === r.readBy)
+      if (selectedId === r.readBy)
         setMessages((x) =>
           x.map((m) =>
             m.recipientId === r.readBy ? { ...m, readAt: r.readAt } : m,
@@ -188,7 +208,7 @@ export default function Dashboard() {
     return () => {
       c.stop().catch(() => {});
     };
-  }, [selected, refresh, refreshGroups]);
+  }, [selectedId, refresh, refreshGroups]);
   const friends = people.filter((x) => x.friendshipStatus === "accepted"),
     others = people.filter((x) => x.friendshipStatus !== "accepted"),
     incomingRequests = people.filter((x) => x.friendshipStatus === "pending" && x.incoming),
@@ -342,23 +362,25 @@ export default function Dashboard() {
             placeholder="Search people"
           />
         </label>
-        <Group
-          title="Friends"
-          people={friends.filter((x) =>
-            x.name.toLowerCase().includes(query.toLowerCase()),
-          )}
-          selected={selected}
-          choose={choose}
-        />
-        <Group
-          title="Public"
-          people={others.filter((x) =>
-            x.name.toLowerCase().includes(query.toLowerCase()),
-          )}
-          selected={selected}
-          choose={choose}
-          add={add}
-        />
+        <div className="people-scroll">
+          <Group
+            title="Friends"
+            people={friends.filter((x) =>
+              x.name.toLowerCase().includes(query.toLowerCase()),
+            )}
+            selected={selected}
+            choose={choose}
+          />
+          <Group
+            title="Public"
+            people={others.filter((x) =>
+              x.name.toLowerCase().includes(query.toLowerCase()),
+            )}
+            selected={selected}
+            choose={choose}
+            add={add}
+          />
+        </div>
         <div className="my-card">
           <Avatar name={me.name} />
           <span>
@@ -448,7 +470,7 @@ export default function Dashboard() {
                       <Avatar name={p.name} />
                       <span>
                         <strong>{p.name}</strong>
-                        <small>{p.online ? "Online now" : p.status}</small>
+                        <small>{p.online ? p.status || "Available" : "Offline"}</small>
                       </span>
                       <b>→</b>
                     </button>
@@ -486,7 +508,7 @@ export default function Dashboard() {
                   <i
                     className={selected.online ? "online-dot" : "offline-dot"}
                   />
-                  {selected.online ? "Online now" : selected.status}
+                  {selected.online ? selected.status || "Available" : "Offline"}
                 </small>
               </span>
             </div>
@@ -502,9 +524,16 @@ export default function Dashboard() {
               ref={messageListRef}
               onScroll={(event) => {
                 const list = event.currentTarget,
-                  isNearLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 90;
-                followLatest.current = isNearLatest;
+                  isNearLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
+                if (!isNearLatest) followLatest.current = false;
                 setShowLatest(!isNearLatest);
+              }}
+              onWheel={(event) => {
+                if (event.deltaY >= 0) return;
+                const list = event.currentTarget;
+                list.scrollTo({ top: list.scrollTop, behavior: "auto" });
+                followLatest.current = false;
+                setShowLatest(true);
               }}
             >
               {!messages.length && (
@@ -546,7 +575,7 @@ export default function Dashboard() {
             </div>
             {showLatest && (
               <button className="latest-message-button" onClick={() => scrollToLatest()} aria-label="Go to latest message">
-                ↓<span>Latest</span>
+                ↓
               </button>
             )}
             <form className="composer" onSubmit={send}>
@@ -911,7 +940,7 @@ function Group({
             </span>
             <span>
               <strong>{p.name}</strong>
-              <small>{p.online ? "Online" : p.status || "Away"}</small>
+              <small>{p.online ? p.status || "Available" : "Offline"}</small>
             </span>
             {p.unread > 0 && <b>{p.unread}</b>}
           </button>

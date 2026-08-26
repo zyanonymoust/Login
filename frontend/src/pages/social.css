@@ -14,6 +14,10 @@
   background: #fbfafc;
   min-height: 100vh;
 }
+.woven-app,
+.woven-app * { scrollbar-width: none; -ms-overflow-style: none; }
+.woven-app::-webkit-scrollbar,
+.woven-app *::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .landing-nav {
   height: 84px;
   max-width: 1180px;
@@ -336,8 +340,11 @@
   position: relative;
   background: white;
   border-right: 1px solid var(--line);
-  padding: 25px 18px 85px;
-  overflow-y: auto;
+  padding: 25px 18px 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .panel-title {
   display: flex;
@@ -370,6 +377,14 @@
   outline: 0;
   background: transparent;
   width: 100%;
+}
+.people-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 0 4px 10px 0;
 }
 .people-group h4 {
   display: flex;
@@ -452,10 +467,10 @@
   font-size: 19px;
 }
 .my-card {
-  position: absolute;
-  bottom: 18px;
-  left: 18px;
-  right: 18px;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 2;
+  margin-top: 10px;
   background: var(--soft);
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -770,8 +785,7 @@
 .file-attachment strong { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-attachment small, .attachment-loading { color: var(--muted); font-size: 10px; }
 .attachment-loading { padding: 9px 0; }
-.latest-message-button { position: absolute !important; z-index: 5 !important; right: 28px; bottom: 82px; display: flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 13px; border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--line)); border-radius: 99px; color: white; background: var(--accent); box-shadow: 0 9px 28px #0004; font-weight: 800; cursor: pointer; animation: latest-arrive .2s ease-out; }
-.latest-message-button span { font-size: 11px; }
+.latest-message-button { position: absolute !important; z-index: 5 !important; right: 28px; bottom: 82px; display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--line)); border-radius: 50%; color: white; background: var(--accent); box-shadow: 0 9px 28px #0004; font-size: 21px; font-weight: 800; cursor: pointer; }
 .image-preview-backdrop { position: fixed !important; z-index: 1100 !important; inset: 0; display: grid; place-items: center; padding: 30px; background: #050711dd; backdrop-filter: blur(10px); }
 .image-preview-card { position: relative; width: min(920px, 94vw); max-height: 90vh; overflow: hidden; border: 1px solid #ffffff24; border-radius: 20px; background: #111626; box-shadow: 0 30px 100px #0009; }
 .image-preview-card > img { display: block; width: 100%; max-height: calc(90vh - 66px); object-fit: contain; background: #080b13; }
@@ -959,6 +973,26 @@
 .woven-app.dark::before { position: fixed; z-index: 0; inset: 0; pointer-events: none; content: ""; opacity: .8; background-image: radial-gradient(circle, #fff 0 1px, transparent 1.6px), radial-gradient(circle, #9ccaff 0 1.2px, transparent 1.8px), radial-gradient(circle, #fff 0 .8px, transparent 1.4px); background-position: 12px 17px, 47px 83px, 91px 41px; background-size: 97px 97px, 149px 149px, 61px 61px; animation: star-drift 45s linear infinite; }
 .woven-app.dark > * { position: relative; z-index: 1; }
 .woven-app.dark .people-panel, .woven-app.dark .app-main, .woven-app.dark .app-main > header, .woven-app.dark .chat-meta, .woven-app.dark .composer, .woven-app.dark .settings-view { background: rgba(16, 21, 39, .88); backdrop-filter: blur(14px); }
+.woven-app.dark .panel-title button {
+  color: #f7f4ff;
+  border: 1px solid #414967;
+  background: #242b49;
+}
+.woven-app.dark .panel-title button:hover {
+  color: #fff;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 28%, #242b49);
+}
+.woven-app.dark .composer button:not(.send) {
+  color: #f7f4ff;
+  border: 1px solid #414967;
+  background: #242b49;
+}
+.woven-app.dark .composer button:not(.send):hover {
+  color: #fff;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 28%, #242b49);
+}
 .woven-app.dark .swatches button.theme-choice { border-color: #3a4161; background: #171d31 !important; color: var(--ink); }
 .woven-app.dark .swatches button.tone-violet { background: linear-gradient(145deg, #2b2349, #171d31) !important; }
 .woven-app.dark .swatches button.tone-ocean { background: linear-gradient(145deg, #16324a, #171d31) !important; }
@@ -1122,7 +1156,6 @@
     max-width: 85%;
   }
   .latest-message-button { right: 16px; bottom: 78px; }
-  .latest-message-button span { display: none; }
   .settings-view {
     margin: 20px;
   }
