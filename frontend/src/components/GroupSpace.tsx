@@ -30,11 +30,13 @@ export default function GroupSpace({
   rooms,
   people,
   me,
+  initialRoomId,
   onRoomsChanged,
 }: {
   rooms: GroupRoom[];
   people: Person[];
   me: Me;
+  initialRoomId?: number | null;
   onRoomsChanged: () => void;
 }) {
   const [active, setActive] = useState<GroupRoom | null>(null),
@@ -54,6 +56,13 @@ export default function GroupSpace({
   const accepted = rooms.filter((x) => x.status === "accepted"),
     pending = rooms.filter((x) => x.status === "pending"),
     publicRooms = rooms.filter((x) => x.status === "available");
+  useEffect(() => {
+    if (!initialRoomId) return;
+    const room = rooms.find(
+      (x) => x.id === initialRoomId && x.status === "accepted",
+    );
+    if (room) setActive(room);
+  }, [initialRoomId, rooms]);
   useEffect(() => {
     if (
       active &&

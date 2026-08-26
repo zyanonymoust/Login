@@ -54,6 +54,7 @@ export default function Dashboard() {
     [uploading, setUploading] = useState(false),
     [showLatest, setShowLatest] = useState(false),
     [groupRooms, setGroupRooms] = useState<GroupRoom[]>([]),
+    [selectedGroupId, setSelectedGroupId] = useState<number | null>(null),
     [view, setView] = useState<"chat" | "home" | "groups" | "profile" | "settings">(
       "home",
     ),
@@ -211,6 +212,9 @@ export default function Dashboard() {
   }, [selectedId, refresh, refreshGroups]);
   const friends = people.filter((x) => x.friendshipStatus === "accepted"),
     others = people.filter((x) => x.friendshipStatus !== "accepted"),
+    acceptedGroups = groupRooms.filter((x) => x.status === "accepted"),
+    jumpPeople = friends.slice(0, acceptedGroups.length ? 2 : 3),
+    jumpGroups = acceptedGroups.slice(0, 3 - jumpPeople.length),
     incomingRequests = people.filter((x) => x.friendshipStatus === "pending" && x.incoming),
     pendingGroups = groupRooms.filter((x) => x.status === "pending"),
     unread = people.reduce((a, x) => a + x.unread, 0),
@@ -465,8 +469,8 @@ export default function Dashboard() {
                   <h3>Jump back in</h3>
                 </div>
                 <div className="quick-grid">
-                  {friends.slice(0, 3).map((p) => (
-                    <button key={p.id} onClick={() => choose(p)}>
+                  {jumpPeople.map((p) => (
+                    <button key={`person-${p.id}`} onClick={() => choose(p)}>
                       <Avatar name={p.name} />
                       <span>
                         <strong>{p.name}</strong>
@@ -475,7 +479,23 @@ export default function Dashboard() {
                       <b>→</b>
                     </button>
                   ))}
-                  {!friends.length && (
+                  {jumpGroups.map((room) => (
+                    <button
+                      key={`group-${room.id}`}
+                      onClick={() => {
+                        setSelectedGroupId(room.id);
+                        setView("groups");
+                      }}
+                    >
+                      <span className="jump-group-avatar">👥</span>
+                      <span>
+                        <strong>{room.name}</strong>
+                        <small>Group · {room.memberCount} members</small>
+                      </span>
+                      <b>→</b>
+                    </button>
+                  ))}
+                  {!jumpPeople.length && !jumpGroups.length && (
                     <div className="empty-card">
                       <b>Your circle starts here</b>
                       <span>Add someone from Public to begin a conversation.</span>
@@ -488,7 +508,7 @@ export default function Dashboard() {
             <BoredomBreak />
           </section>
         )}
-        {view === "groups" && <GroupSpace rooms={groupRooms} people={people} me={me} onRoomsChanged={refreshGroups} />}
+        {view === "groups" && <GroupSpace rooms={groupRooms} people={people} me={me} initialRoomId={selectedGroupId} onRoomsChanged={refreshGroups} />}
         {view === "chat" && selected && (
           <section
             className={`chat-view bg-${chatBg.startsWith("data:") ? "custom" : chatBg}`}

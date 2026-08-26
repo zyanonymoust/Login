@@ -630,6 +630,7 @@
   padding: 16px;
   text-align: left;
 }
+.jump-group-avatar { width: 42px; height: 42px; display: grid; flex: none; place-items: center; border-radius: 13px; background: color-mix(in srgb, var(--accent) 15%, var(--soft)); font-size: 20px; }
 .quick-grid > button span,
 .empty-card {
   display: flex;
@@ -899,7 +900,8 @@
 .background-settings h3 { font-size: 18px; }
 .background-settings p { color: var(--muted); }
 .background-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-.background-options button, .background-options label { display: flex; flex-direction: column; gap: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 12px; background: white; text-align: center; font-size: 12px; cursor: pointer; }
+.background-options button, .background-options label { display: flex; min-width: 0; min-height: 138px; flex-direction: column; gap: 8px; margin: 0; padding: 9px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 12px; background: white; text-align: center; font-size: 12px; cursor: pointer; }
+.background-options button > span, .background-options label > span { display: grid; min-height: 18px; place-items: center; }
 .background-options .active { border: 2px solid var(--accent); }
 .background-options input { display: none; }
 .bg-preview { display: block; height: 62px; border-radius: 8px; background: #fbfafc; }
