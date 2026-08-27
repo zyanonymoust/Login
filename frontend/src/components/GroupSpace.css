@@ -302,6 +302,12 @@
 .message-permission > button i { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: white; transition: left .18s; }
 .message-permission > button.enabled { background: var(--accent); }
 .message-permission > button.enabled i { left: 21px; }
+.member-owner-badge { padding: 5px 8px; border-radius: 7px; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); font-size: 9px; font-weight: 800; }
+.member-controls { display: flex; align-items: flex-end; flex-direction: column; gap: 7px; }
+.member-actions { display: flex; justify-content: flex-end; gap: 5px; }
+.member-actions button { padding: 5px 7px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: transparent; font-size: 9px; cursor: pointer; }
+.member-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.member-actions button.danger { color: #d84f5f; }
 .woven-app.dark .group-details-modal { background: #141929; }
 .woven-app.dark .group-details-modal input, .woven-app.dark .group-details-modal textarea, .woven-app.dark .permission-member, .woven-app.dark .group-visibility { background: #20263a; }
 .meeting-modal {

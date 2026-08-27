@@ -37,11 +37,10 @@ type Me = {
   bio?: string;
   status?: string;
 };
+type RecentConversation = { kind: "person" | "group"; id: number; name: string; preview: string; activityAt: string; memberCount: number };
 export type GroupRoom = { id:number; name:string; description:string; isPublic:boolean; status:string; role:string; isMuted:boolean; doNotDisturb:boolean; memberCount:number; invitedBy:string; createdAt:string };
 export default function Dashboard() {
-  const fileInput = useRef<HTMLInputElement>(null),
-    messageListRef = useRef<HTMLDivElement>(null),
-    followLatest = useRef(true);
+  const fileInput = useRef<HTMLInputElement>(null);
   const nav = useNavigate(),
     [me, setMe] = useState<Me>(() =>
       JSON.parse(localStorage.getItem("user") || "{}"),
@@ -52,8 +51,8 @@ export default function Dashboard() {
     [messageDetails, setMessageDetails] = useState<Message | null>(null),
     [draft, setDraft] = useState(""),
     [uploading, setUploading] = useState(false),
-    [showLatest, setShowLatest] = useState(false),
     [groupRooms, setGroupRooms] = useState<GroupRoom[]>([]),
+    [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]),
     [selectedGroupId, setSelectedGroupId] = useState<number | null>(null),
     [view, setView] = useState<"chat" | "home" | "groups" | "profile" | "settings">(
       "home",
@@ -73,14 +72,6 @@ export default function Dashboard() {
       () => localStorage.getItem("woven-pointer-effect") || "default",
     ),
     [friendshipStreak] = useState(updateActivityStreak);
-  const selectedId = selected?.id;
-  const scrollToLatest = useCallback((behavior: ScrollBehavior = "smooth") => {
-    const list = messageListRef.current;
-    if (!list) return;
-    followLatest.current = true;
-    setShowLatest(false);
-    list.scrollTo({ top: list.scrollHeight, behavior });
-  }, []);
   const refresh = useCallback(async () => {
     try {
       const d = await apiRequest<Person[]>("/api/social/people");
@@ -93,43 +84,31 @@ export default function Dashboard() {
   const refreshGroups = useCallback(async () => {
     try { setGroupRooms(await apiRequest<GroupRoom[]>("/api/groups")); } catch { return; }
   }, []);
+  const refreshRecent = useCallback(async () => {
+    try { setRecentConversations(await apiRequest<RecentConversation[]>("/api/messages/recent")); } catch { return; }
+  }, []);
   useEffect(() => {
     apiRequest<Me>("/api/auth/me")
       .then(setMe)
       .catch(() => {});
-    refresh(); refreshGroups();
+    refresh(); refreshGroups(); refreshRecent();
     apiRequest("/api/social/heartbeat", { method: "POST" }).catch(() => {});
     const t = setInterval(() => {
       refresh();
       apiRequest("/api/social/heartbeat", { method: "POST" }).catch(() => {});
     }, 15000);
     return () => clearInterval(t);
-  }, [refresh, refreshGroups]);
+  }, [refresh, refreshGroups, refreshRecent]);
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selected) return;
     let a = true;
-    followLatest.current = true;
-    setShowLatest(false);
-    apiRequest<Message[]>(`/api/messages/${selectedId}`)
+    apiRequest<Message[]>(`/api/messages/${selected.id}`)
       .then((d) => a && setMessages(d))
       .catch(() => {});
     return () => {
       a = false;
     };
-  }, [selectedId]);
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      if (followLatest.current) {
-        scrollToLatest("auto");
-        return;
-      }
-      const list = messageListRef.current;
-      if (!list) return;
-      const isNearLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
-      setShowLatest(!isNearLatest);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [messages, scrollToLatest]);
+  }, [selected]);
   useEffect(() => localStorage.setItem("woven-theme", theme), [theme]);
   useEffect(() => localStorage.setItem("woven-dark", darkMode ? "on" : "off"), [darkMode]);
   useEffect(() => localStorage.setItem("woven-chat-bg", chatBg), [chatBg]);
@@ -166,34 +145,25 @@ export default function Dashboard() {
         .withAutomaticReconnect()
         .configureLogging(LogLevel.Warning)
         .build();
-    const keepCurrentMessagePosition = () => {
-      const list = messageListRef.current;
-      if (!list) return;
-      const isNearLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
-      if (!isNearLatest) {
-        followLatest.current = false;
-        setShowLatest(true);
-      }
-    };
     c.on("MessageReceived", (m: Message) => {
       refresh();
-      keepCurrentMessagePosition();
+      refreshRecent();
       if (
-        selectedId &&
-        (m.senderId === selectedId || m.recipientId === selectedId)
+        selected &&
+        (m.senderId === selected.id || m.recipientId === selected.id)
       )
         setMessages((x) => (x.some((y) => y.id === m.id) ? x : [...x, m]));
     });
     c.on("MessageSent", (m: Message) => {
-      keepCurrentMessagePosition();
+      refreshRecent();
       if (
-        selectedId &&
-        (m.senderId === selectedId || m.recipientId === selectedId)
+        selected &&
+        (m.senderId === selected.id || m.recipientId === selected.id)
       )
         setMessages((x) => (x.some((y) => y.id === m.id) ? x : [...x, m]));
     });
     c.on("MessagesRead", (r: { readBy: number; readAt: string }) => {
-      if (selectedId === r.readBy)
+      if (selected?.id === r.readBy)
         setMessages((x) =>
           x.map((m) =>
             m.recipientId === r.readBy ? { ...m, readAt: r.readAt } : m,
@@ -204,17 +174,14 @@ export default function Dashboard() {
     c.on("FriendRequestReceived", refresh);
     c.on("FriendRequestUpdated", refresh);
     c.on("GroupInviteReceived", refreshGroups);
-    c.on("GroupMembershipChanged", refreshGroups);
+    c.on("GroupMembershipChanged", () => { refreshGroups(); refreshRecent(); });
     c.start().catch(() => {});
     return () => {
       c.stop().catch(() => {});
     };
-  }, [selectedId, refresh, refreshGroups]);
+  }, [selected, refresh, refreshGroups, refreshRecent]);
   const friends = people.filter((x) => x.friendshipStatus === "accepted"),
     others = people.filter((x) => x.friendshipStatus !== "accepted"),
-    acceptedGroups = groupRooms.filter((x) => x.status === "accepted"),
-    jumpPeople = friends.slice(0, acceptedGroups.length ? 2 : 3),
-    jumpGroups = acceptedGroups.slice(0, 3 - jumpPeople.length),
     incomingRequests = people.filter((x) => x.friendshipStatus === "pending" && x.incoming),
     pendingGroups = groupRooms.filter((x) => x.status === "pending"),
     unread = people.reduce((a, x) => a + x.unread, 0),
@@ -241,14 +208,13 @@ export default function Dashboard() {
       e.preventDefault();
       if (!selected || !draft.trim()) return;
       const content = draft;
-      followLatest.current = true;
       setDraft("");
       await apiRequest(`/api/messages/${selected.id}`, {
         method: "POST",
         body: JSON.stringify({ content }),
       });
       setMessages(await apiRequest<Message[]>(`/api/messages/${selected.id}`));
-      window.requestAnimationFrame(() => scrollToLatest());
+      refreshRecent();
     },
     save = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -285,7 +251,6 @@ export default function Dashboard() {
         return;
       }
       setUploading(true);
-      followLatest.current = true;
       try {
         const body = new FormData();
         body.append("file", file);
@@ -366,25 +331,23 @@ export default function Dashboard() {
             placeholder="Search people"
           />
         </label>
-        <div className="people-scroll">
-          <Group
-            title="Friends"
-            people={friends.filter((x) =>
-              x.name.toLowerCase().includes(query.toLowerCase()),
-            )}
-            selected={selected}
-            choose={choose}
-          />
-          <Group
-            title="Public"
-            people={others.filter((x) =>
-              x.name.toLowerCase().includes(query.toLowerCase()),
-            )}
-            selected={selected}
-            choose={choose}
-            add={add}
-          />
-        </div>
+        <Group
+          title="Friends"
+          people={friends.filter((x) =>
+            x.name.toLowerCase().includes(query.toLowerCase()),
+          )}
+          selected={selected}
+          choose={choose}
+        />
+        <Group
+          title="Public"
+          people={others.filter((x) =>
+            x.name.toLowerCase().includes(query.toLowerCase()),
+          )}
+          selected={selected}
+          choose={choose}
+          add={add}
+        />
         <div className="my-card">
           <Avatar name={me.name} />
           <span>
@@ -413,7 +376,7 @@ export default function Dashboard() {
           <div className="header-tools">
             <button onClick={() => setNotice(!notice)}>
               ♢{notificationCount > 0 && <b>{notificationCount}</b>}
-            </button>
+                      </button>
             <Avatar name={me.name} />
             {notice && (
               <div className="notice-pop">
@@ -469,33 +432,25 @@ export default function Dashboard() {
                   <h3>Jump back in</h3>
                 </div>
                 <div className="quick-grid">
-                  {jumpPeople.map((p) => (
-                    <button key={`person-${p.id}`} onClick={() => choose(p)}>
-                      <Avatar name={p.name} />
-                      <span>
-                        <strong>{p.name}</strong>
-                        <small>{p.online ? p.status || "Available" : "Offline"}</small>
-                      </span>
-                      <b>→</b>
-                    </button>
-                  ))}
-                  {jumpGroups.map((room) => (
-                    <button
-                      key={`group-${room.id}`}
-                      onClick={() => {
-                        setSelectedGroupId(room.id);
+                  {recentConversations.map((item) => (
+                    <button key={`${item.kind}-${item.id}`} onClick={() => {
+                      if (item.kind === "group") {
+                        setSelectedGroupId(item.id);
                         setView("groups");
-                      }}
-                    >
-                      <span className="jump-group-avatar">👥</span>
+                        return;
+                      }
+                      const person = people.find((p) => p.id === item.id);
+                      if (person) choose(person);
+                    }}>
+                      {item.kind === "person" ? <Avatar name={item.name} /> : <span className="jump-group-avatar">👥</span>}
                       <span>
-                        <strong>{room.name}</strong>
-                        <small>Group · {room.memberCount} members</small>
+                        <strong>{item.name}</strong>
+                        <small>{item.preview}</small>
                       </span>
                       <b>→</b>
                     </button>
                   ))}
-                  {!jumpPeople.length && !jumpGroups.length && (
+                  {!recentConversations.length && (
                     <div className="empty-card">
                       <b>Your circle starts here</b>
                       <span>Add someone from Public to begin a conversation.</span>
@@ -528,7 +483,7 @@ export default function Dashboard() {
                   <i
                     className={selected.online ? "online-dot" : "offline-dot"}
                   />
-                  {selected.online ? selected.status || "Available" : "Offline"}
+                  {selected.online ? "Online now" : selected.status}
                 </small>
               </span>
             </div>
@@ -539,23 +494,7 @@ export default function Dashboard() {
                 {selected.friendshipStatus === "pending" && !selected.incoming ? <button disabled>Request sent</button> : selected.incoming ? <div><button onClick={() => acceptFriend(selected)}>Accept</button><button className="decline" onClick={() => declineFriend(selected)}>Decline</button></div> : <button onClick={() => add(selected)}>Add friend</button>}
               </div>
             )}
-            <div
-              className="message-list"
-              ref={messageListRef}
-              onScroll={(event) => {
-                const list = event.currentTarget,
-                  isNearLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
-                if (!isNearLatest) followLatest.current = false;
-                setShowLatest(!isNearLatest);
-              }}
-              onWheel={(event) => {
-                if (event.deltaY >= 0) return;
-                const list = event.currentTarget;
-                list.scrollTo({ top: list.scrollTop, behavior: "auto" });
-                followLatest.current = false;
-                setShowLatest(true);
-              }}
-            >
+            <div className="message-list">
               {!messages.length && (
                 <div className="start-chat">
                   <Avatar name={selected.name} />
@@ -593,11 +532,6 @@ export default function Dashboard() {
                 );
               })}
             </div>
-            {showLatest && (
-              <button className="latest-message-button" onClick={() => scrollToLatest()} aria-label="Go to latest message">
-                ↓
-              </button>
-            )}
             <form className="composer" onSubmit={send}>
               <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading} title="Add image or file">{uploading ? "…" : "＋"}</button>
               <input ref={fileInput} className="attachment-input" type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onChange={sendAttachment} />
@@ -777,8 +711,7 @@ function updateActivityStreak() {
 }
 
 function MessageAttachment({ message }: { message: Message }) {
-  const [url, setUrl] = useState(""),
-    [previewing, setPreviewing] = useState(false);
+  const [url, setUrl] = useState("");
   useEffect(() => {
     let objectUrl = "";
     fetch(`${API_BASE_URL}${message.attachmentUrl}`, {
@@ -798,16 +731,7 @@ function MessageAttachment({ message }: { message: Message }) {
 
   const image = message.attachmentContentType?.startsWith("image/");
   if (!url) return <div className="attachment-loading">Loading attachment…</div>;
-  if (image) return <>
-    <button className="image-attachment" type="button" onClick={() => setPreviewing(true)}><img src={url} alt={message.attachmentName || "Shared image"} /><span>{message.attachmentName}</span></button>
-    {previewing && <div className="image-preview-backdrop" onClick={() => setPreviewing(false)}>
-      <section className="image-preview-card" onClick={(event) => event.stopPropagation()}>
-        <button className="image-preview-close" onClick={() => setPreviewing(false)}>×</button>
-        <img src={url} alt={message.attachmentName || "Shared image"} />
-        <footer><span>{message.attachmentName}</span><a href={url} download={message.attachmentName}>Download</a></footer>
-      </section>
-    </div>}
-  </>;
+  if (image) return <a className="image-attachment" href={url} download={message.attachmentName}><img src={url} alt={message.attachmentName || "Shared image"} /><span>{message.attachmentName}</span></a>;
   return <a className="file-attachment" href={url} download={message.attachmentName}><b>📎</b><span><strong>{message.attachmentName}</strong><small>Click to download</small></span></a>;
 }
 
@@ -960,7 +884,7 @@ function Group({
             </span>
             <span>
               <strong>{p.name}</strong>
-              <small>{p.online ? p.status || "Available" : "Offline"}</small>
+              <small>{p.online ? "Online" : p.status || "Away"}</small>
             </span>
             {p.unread > 0 && <b>{p.unread}</b>}
           </button>

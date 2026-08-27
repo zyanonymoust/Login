@@ -12,7 +12,44 @@ namespace Login.Server.Controllers;
 [Authorize, ApiController, Route("api/messages")]
 public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : ControllerBase
 {
+    private static readonly IReadOnlyDictionary<string, string[]> AllowedAttachmentTypes = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+    {
+        [".png"] = ["image/png"], [".jpg"] = ["image/jpeg"], [".jpeg"] = ["image/jpeg"], [".gif"] = ["image/gif"], [".webp"] = ["image/webp"],
+        [".pdf"] = ["application/pdf"], [".txt"] = ["text/plain"], [".zip"] = ["application/zip", "application/x-zip-compressed"],
+        [".doc"] = ["application/msword"], [".docx"] = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+        [".xls"] = ["application/vnd.ms-excel"], [".xlsx"] = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]
+    };
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    [HttpGet("recent")]
+    public async Task<IActionResult> Recent()
+    {
+        var me = UserId;
+        var directRows = await db.Messages.AsNoTracking()
+            .Where(x => x.SenderId == me || x.RecipientId == me)
+            .OrderByDescending(x => x.SentAt)
+            .Take(100)
+            .Select(x => new { x.SenderId, x.RecipientId, senderName = x.Sender.Name, recipientName = x.Recipient.Name, x.Content, x.AttachmentName, x.SentAt })
+            .ToListAsync();
+        var direct = directRows.GroupBy(x => x.SenderId == me ? x.RecipientId : x.SenderId).Select(x =>
+        {
+            var latest = x.First();
+            return new RecentConversation("person", x.Key, latest.SenderId == me ? latest.recipientName : latest.senderName, latest.Content.Length > 0 ? latest.Content : latest.AttachmentName ?? "Attachment", latest.SentAt, 0);
+        });
+        var groupIds = await db.GroupMembers.AsNoTracking().Where(x => x.UserId == me && x.Status == "accepted").Select(x => x.GroupRoomId).ToListAsync();
+        var groupRows = await db.GroupMessages.AsNoTracking()
+            .Where(x => groupIds.Contains(x.GroupRoomId))
+            .OrderByDescending(x => x.SentAt)
+            .Take(100)
+            .Select(x => new { x.GroupRoomId, x.GroupRoom.Name, x.Content, x.SentAt, memberCount = x.GroupRoom.Members.Count(m => m.Status == "accepted") })
+            .ToListAsync();
+        var groups = groupRows.GroupBy(x => x.GroupRoomId).Select(x =>
+        {
+            var latest = x.First();
+            return new RecentConversation("group", x.Key, latest.Name, latest.Content, latest.SentAt, latest.memberCount);
+        });
+        return Ok(direct.Concat(groups).OrderByDescending(x => x.ActivityAt).Take(3));
+    }
 
     [HttpGet("{otherId:int}")]
     public async Task<IActionResult> Conversation(int otherId, [FromQuery] long after = 0)
@@ -43,8 +80,14 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
     {
         if (file.Length is < 1 or > 10_000_000) return BadRequest(new { message = "File must be smaller than 10 MB." });
         if (!await db.Users.AnyAsync(x => x.Id == otherId)) return NotFound();
+        var safeName = Path.GetFileName(file.FileName);
+        var extension = Path.GetExtension(safeName);
+        if (!AllowedAttachmentTypes.TryGetValue(extension, out var contentTypes) || !contentTypes.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))
+            return BadRequest(new { message = "This file type is not allowed." });
+        var safeCaption = (caption ?? string.Empty).Trim();
+        if (safeCaption.Length > 4000) return BadRequest(new { message = "Caption must be 4000 characters or fewer." });
         await using var stream = new MemoryStream(); await file.CopyToAsync(stream);
-        var row = new ChatMessage { SenderId = UserId, RecipientId = otherId, Content = (caption ?? string.Empty).Trim(), AttachmentName = Path.GetFileName(file.FileName), AttachmentContentType = file.ContentType, AttachmentData = stream.ToArray() };
+        var row = new ChatMessage { SenderId = UserId, RecipientId = otherId, Content = safeCaption, AttachmentName = safeName, AttachmentContentType = file.ContentType, AttachmentData = stream.ToArray() };
         db.Messages.Add(row); await db.SaveChangesAsync();
         var payload = new { row.Id, row.SenderId, row.RecipientId, row.Content, row.SentAt, row.ReadAt, row.AttachmentName, row.AttachmentContentType, attachmentUrl = $"/api/messages/attachment/{row.Id}" };
         await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("MessageReceived", payload);
@@ -61,4 +104,5 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
         return File(item.AttachmentData!, item.AttachmentContentType ?? "application/octet-stream", item.AttachmentName);
     }
     public record MessageRequest(string Content);
+    public record RecentConversation(string Kind, int Id, string Name, string Preview, DateTime ActivityAt, int MemberCount);
 }

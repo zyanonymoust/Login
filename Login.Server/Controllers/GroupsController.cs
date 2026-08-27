@@ -116,6 +116,52 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
         await hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("GroupMuteChanged", new { roomId, muted = request.Muted }); return Ok();
     }
 
+    [HttpPut("{roomId:int}/members/{userId:int}/role")]
+    public async Task<IActionResult> ChangeRole(int roomId, int userId, RoleRequest request)
+    {
+        if (!await IsOwner(roomId, UserId)) return Forbid();
+        var role = request.Role.Trim().ToLowerInvariant();
+        if (role is not ("member" or "admin")) return BadRequest(new { message = "Role must be member or admin." });
+        var member = await db.GroupMembers.FirstOrDefaultAsync(x => x.GroupRoomId == roomId && x.UserId == userId && x.Status == "accepted" && x.Role != "owner");
+        if (member is null) return NotFound();
+        member.Role = role;
+        await db.SaveChangesAsync();
+        await hub.Clients.Group(ChatHub.RoomGroup(roomId)).SendAsync("GroupMembershipChanged", new { roomId, userId, status = "role-changed", role });
+        return Ok();
+    }
+
+    [HttpDelete("{roomId:int}/members/{userId:int}")]
+    public async Task<IActionResult> RemoveMember(int roomId, int userId)
+    {
+        if (!await IsOwner(roomId, UserId) || userId == UserId) return Forbid();
+        var member = await db.GroupMembers.FirstOrDefaultAsync(x => x.GroupRoomId == roomId && x.UserId == userId && x.Role != "owner");
+        if (member is null) return NotFound();
+        db.GroupMembers.Remove(member);
+        await db.SaveChangesAsync();
+        await hub.Clients.Group(ChatHub.RoomGroup(roomId)).SendAsync("GroupMembershipChanged", new { roomId, userId, status = "removed" });
+        await hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("GroupMembershipChanged", new { roomId, userId, status = "removed" });
+        return NoContent();
+    }
+
+    [HttpPost("{roomId:int}/transfer/{userId:int}")]
+    public async Task<IActionResult> TransferOwnership(int roomId, int userId)
+    {
+        var owner = await db.GroupMembers.FirstOrDefaultAsync(x => x.GroupRoomId == roomId && x.UserId == UserId && x.Role == "owner" && x.Status == "accepted");
+        if (owner is null || userId == UserId) return Forbid();
+        var nextOwner = await db.GroupMembers.FirstOrDefaultAsync(x => x.GroupRoomId == roomId && x.UserId == userId && x.Status == "accepted");
+        var room = await db.GroupRooms.FindAsync(roomId);
+        if (nextOwner is null || room is null) return NotFound();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        owner.Role = "member";
+        nextOwner.Role = "owner";
+        nextOwner.IsMuted = false;
+        room.CreatedById = userId;
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        await hub.Clients.Group(ChatHub.RoomGroup(roomId)).SendAsync("GroupMembershipChanged", new { roomId, userId, status = "owner-transferred" });
+        return Ok();
+    }
+
     [HttpPost("{roomId:int}/dnd")]
     public async Task<IActionResult> SetDnd(int roomId, DndRequest request)
     {
@@ -133,9 +179,11 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     }
 
     private Task<bool> IsAccepted(int roomId, int userId) => db.GroupMembers.AnyAsync(x => x.GroupRoomId == roomId && x.UserId == userId && x.Status == "accepted");
+    private Task<bool> IsOwner(int roomId, int userId) => db.GroupMembers.AnyAsync(x => x.GroupRoomId == roomId && x.UserId == userId && x.Status == "accepted" && x.Role == "owner");
     public record CreateRoom(string Name, bool IsPublic, string? Description);
     public record SendMessage(string Content);
     public record UpdateRoom(string Name, string Description);
     public record MuteRequest(bool Muted);
+    public record RoleRequest(string Role);
     public record DndRequest(bool Enabled);
 }

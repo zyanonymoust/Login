@@ -171,6 +171,25 @@ export default function GroupSpace({
       if (!active) return; await apiRequest(`/api/groups/${active.id}/members/${member.userId}/mute`, { method: "POST", body: JSON.stringify({ muted: !member.isMuted }) });
       setMembers((items) => items.map((x) => x.userId === member.userId ? { ...x, isMuted: !x.isMuted } : x));
     },
+    changeRole = async (member: Member) => {
+      if (!active) return;
+      const role = member.role === "admin" ? "member" : "admin";
+      await apiRequest(`/api/groups/${active.id}/members/${member.userId}/role`, { method: "PUT", body: JSON.stringify({ role }) });
+      setMembers((items) => items.map((x) => x.userId === member.userId ? { ...x, role } : x));
+    },
+    removeMember = async (member: Member) => {
+      if (!active || !window.confirm(`Remove ${member.name} from ${active.name}?`)) return;
+      await apiRequest(`/api/groups/${active.id}/members/${member.userId}`, { method: "DELETE" });
+      setMembers((items) => items.filter((x) => x.userId !== member.userId));
+      await onRoomsChanged();
+    },
+    transferOwnership = async (member: Member) => {
+      if (!active || !window.confirm(`Make ${member.name} the owner of ${active.name}? You will become a member.`)) return;
+      await apiRequest(`/api/groups/${active.id}/transfer/${member.userId}`, { method: "POST" });
+      setActive({ ...active, role: "member" });
+      setShowDetails(false);
+      await onRoomsChanged();
+    },
     openDetails = () => {
       if (!active) return;
       setDetailName(active.name);
@@ -352,8 +371,8 @@ export default function GroupSpace({
                       {members.map((member) => (
                         <div className="permission-member" key={member.userId}>
                           <i className={member.online ? "online-dot" : "offline-dot"} />
-                          <div><strong>{member.name}</strong><small>{member.email}</small><em>{member.role === "owner" ? "Owner" : member.status === "pending" ? "Invitation pending" : member.doNotDisturb ? "Do not disturb" : "Member"}</em></div>
-                          <div className="message-permission"><span><strong>{member.isMuted ? "Cannot talk" : "Can talk"}</strong><small>Send group messages</small></span>{member.role === "owner" ? <b>Owner</b> : <button type="button" className={member.isMuted ? "" : "enabled"} onClick={() => muteMember(member)} aria-label={`${member.isMuted ? "Allow" : "Mute"} ${member.name}`}><i /></button>}</div>
+                          <div><strong>{member.name}</strong><small>{member.email}</small><em>{member.role === "owner" ? "Owner" : member.status === "pending" ? "Invitation pending" : member.role === "admin" ? "Administrator" : member.doNotDisturb ? "Do not disturb" : "Member"}</em></div>
+                          {member.role === "owner" ? <div className="member-owner-badge">Owner</div> : <div className="member-controls"><div className="message-permission"><span><strong>{member.isMuted ? "Cannot talk" : "Can talk"}</strong><small>Send group messages</small></span><button type="button" className={member.isMuted ? "" : "enabled"} onClick={() => muteMember(member)} aria-label={`${member.isMuted ? "Allow" : "Mute"} ${member.name}`}><i /></button></div><div className="member-actions"><button type="button" onClick={() => changeRole(member)}>{member.role === "admin" ? "Remove admin" : "Make admin"}</button><button type="button" onClick={() => transferOwnership(member)}>Transfer owner</button><button type="button" className="danger" onClick={() => removeMember(member)}>Remove</button></div></div>}
                         </div>
                       ))}
                     </div>
