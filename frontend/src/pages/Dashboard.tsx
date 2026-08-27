@@ -33,6 +33,8 @@ type Message = {
   attachmentUrl?: string;
   replyTo?: { id: number; senderId: number; content: string; attachmentName?: string };
   reactions?: { emoji: string; count: number; reactedByMe?: boolean }[];
+  clientMessageId?: string;
+  deliveryStatus?: "sending" | "sent" | "delivered" | "failed";
 };
 type Me = {
   id?: number;
@@ -66,6 +68,7 @@ export default function Dashboard() {
     [chatSearch, setChatSearch] = useState(""),
     [draft, setDraft] = useState(""),
     [chatError, setChatError] = useState(""),
+    [sending, setSending] = useState(false),
     [showLatestButton, setShowLatestButton] = useState(false),
     [uploading, setUploading] = useState(false),
     [groupRooms, setGroupRooms] = useState<GroupRoom[]>([]),
@@ -138,7 +141,8 @@ export default function Dashboard() {
     pinnedToLatestRef.current = true;
     setShowLatestButton(false);
     setChatError("");
-  }, [selected?.id]);
+    setDraft(selectedId ? localStorage.getItem(`woven-draft-${selectedId}`) || "" : "");
+  }, [selectedId]);
   useEffect(() => {
     const list = messageListRef.current;
     if (!list) return;
@@ -231,7 +235,13 @@ export default function Dashboard() {
         selectedId &&
         (m.senderId === selectedId || m.recipientId === selectedId)
       )
-        setMessages((x) => (x.some((y) => y.id === m.id) ? x : [...x, m]));
+        setMessages((items) => {
+          const optimisticIndex = m.clientMessageId
+            ? items.findIndex((item) => item.clientMessageId === m.clientMessageId)
+            : -1;
+          if (optimisticIndex >= 0) return items.map((item, index) => index === optimisticIndex ? { ...m, deliveryStatus: "delivered" } : item);
+          return items.some((item) => item.id === m.id) ? items : [...items, { ...m, deliveryStatus: "delivered" }];
+        });
     });
     c.on("MessagesRead", (r: { readBy: number; readAt: string }) => {
       if (selectedId === r.readBy)
@@ -271,11 +281,11 @@ export default function Dashboard() {
     };
   }, [selectedId, refresh, refreshGroups, refreshRecent, refreshNotifications, me.id, me.userId, desktopNotifications]);
   useEffect(() => {
-    if (!selected || !chatHubRef.current) return;
-    chatHubRef.current.invoke("SendTyping", selected.id, draft.trim().length > 0).catch(() => {});
-    const timer = window.setTimeout(() => chatHubRef.current?.invoke("SendTyping", selected.id, false).catch(() => {}), 1200);
+    if (!selectedId || !chatHubRef.current) return;
+    chatHubRef.current.invoke("SendTyping", selectedId, draft.trim().length > 0).catch(() => {});
+    const timer = window.setTimeout(() => chatHubRef.current?.invoke("SendTyping", selectedId, false).catch(() => {}), 1200);
     return () => window.clearTimeout(timer);
-  }, [draft, selected]);
+  }, [draft, selectedId]);
   const friends = people.filter((x) => x.friendshipStatus === "accepted"),
     others = people.filter((x) => x.friendshipStatus !== "accepted"),
     incomingRequests = people.filter((x) => x.friendshipStatus === "pending" && x.incoming),
@@ -388,27 +398,56 @@ export default function Dashboard() {
     reactToMessage = async (message: Message, emoji: string) => {
       await apiRequest(`/api/messages/item/${message.id}/reactions`, { method: "POST", body: JSON.stringify({ emoji }) });
     },
-    send = async (e: SubmitEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      if (!selected || !draft.trim()) return;
+    sendMessage = async (content: string, replyToId?: number, existingClientId?: string) => {
+      if (!selectedId || sending) return;
+      const clientMessageId = existingClientId || crypto.randomUUID();
+      const currentUserId = me.id || me.userId || 0;
+      const optimistic: Message = {
+        id: -Date.now(),
+        senderId: currentUserId,
+        recipientId: selectedId,
+        content,
+        sentAt: new Date().toISOString(),
+        clientMessageId,
+        deliveryStatus: "sending",
+      };
       pinnedToLatestRef.current = true;
       setShowLatestButton(false);
-      const content = draft;
-      setDraft("");
+      setSending(true);
       setChatError("");
+      setMessages((items) => {
+        const existing = items.findIndex((item) => item.clientMessageId === clientMessageId);
+        return existing >= 0
+          ? items.map((item, index) => index === existing ? { ...item, deliveryStatus: "sending" } : item)
+          : [...items, optimistic];
+      });
       try {
-        await apiRequest(`/api/messages/${selected.id}`, {
+        const sent = await apiRequest<Message>(`/api/messages/${selectedId}`, {
           method: "POST",
-          body: JSON.stringify({ content, replyToId: replyingTo?.id }),
+          body: JSON.stringify({ content, replyToId, clientMessageId }),
         });
+        setMessages((items) => items.map((item) => item.clientMessageId === clientMessageId
+          ? { ...sent, clientMessageId, deliveryStatus: item.deliveryStatus === "delivered" ? "delivered" : "sent" }
+          : item));
         setReplyingTo(null);
-        setMessages(await apiRequest<Message[]>(`/api/messages/${selected.id}`));
         refreshRecent();
       } catch (error) {
-        setDraft(content);
+        setMessages((items) => items.map((item) => item.clientMessageId === clientMessageId ? { ...item, deliveryStatus: "failed" } : item));
         setChatError(error instanceof Error ? error.message : "The message could not be sent.");
+      } finally {
+        setSending(false);
       }
     },
+    send = async (e: SubmitEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      const content = draft.trim();
+      if (!selectedId || !content || sending) return;
+      const replyToId = replyingTo?.id;
+      setDraft("");
+      localStorage.removeItem(`woven-draft-${selectedId}`);
+      await sendMessage(content, replyToId);
+    },
+    retryMessage = (message: Message) => sendMessage(message.content, message.replyTo?.id, message.clientMessageId),
     save = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       const f = new FormData(e.currentTarget),
@@ -740,9 +779,10 @@ export default function Dashboard() {
                       {m.senderId === (me.id || me.userId) && (
                         <small>
                           {day.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          <span className={m.readAt ? "read-state read" : "read-state"}>
-                            {m.readAt ? " ✓✓ Read" : " ✓ Sent"}
+                          <span className={`${m.readAt ? "read-state read" : "read-state"} ${m.deliveryStatus || ""}`}>
+                            {m.readAt ? " ✓✓ Read" : m.deliveryStatus === "sending" ? " Sending…" : m.deliveryStatus === "failed" ? " Failed" : m.deliveryStatus === "delivered" ? " ✓✓ Delivered" : " ✓ Sent"}
                           </span>
+                          {m.deliveryStatus === "failed" && <button className="retry-message" type="button" onClick={(event) => { event.stopPropagation(); retryMessage(m); }}>Retry</button>}
                         </small>
                       )}
                     </div>
@@ -757,12 +797,22 @@ export default function Dashboard() {
               {replyingTo && <div className="replying-preview"><span><strong>Replying to {replyingTo.senderId === (me.id || me.userId) ? "yourself" : selected.name}</strong><small>{replyingTo.content || replyingTo.attachmentName || "Attachment"}</small></span><button type="button" onClick={() => setReplyingTo(null)} aria-label="Cancel reply">×</button></div>}
               <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading} title="Add image or file">{uploading ? "…" : "＋"}</button>
               <input ref={fileInput} className="attachment-input" type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onChange={sendAttachment} />
-              <input
+              <textarea
+                rows={1}
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  if (selectedId) localStorage.setItem(`woven-draft-${selectedId}`, event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
                 placeholder="Type something…"
               />
-              <button className="send">↑</button>
+              <button className="send" disabled={sending || !draft.trim()} aria-label={sending ? "Sending message" : "Send message"}>{sending ? "…" : "↑"}</button>
             </form>
             {messageDetails && (
               <div className="message-detail-backdrop" onClick={() => setMessageDetails(null)}>

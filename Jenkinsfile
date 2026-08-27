@@ -7,6 +7,7 @@ pipeline {
         SERVER_HOST_PORT = '8084'
         FRONTEND_HOST_PORT = '3003'
         E2E_BASE_URL = 'http://localhost:3003'
+        E2E_API_URL = 'http://localhost:8084'
     }
 
     options {

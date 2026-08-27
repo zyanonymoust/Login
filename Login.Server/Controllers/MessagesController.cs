@@ -76,7 +76,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
         var muted = await db.ConversationPreferences.AnyAsync(x => x.UserId == otherId && x.OtherUserId == UserId && x.IsMuted);
         if (!muted) db.Notifications.Add(new Notification { UserId = otherId, Type = "message", Title = senderName, Body = content, TargetKind = "person", TargetId = UserId });
         await db.SaveChangesAsync();
-        var payload = new { row.Id, row.SenderId, row.RecipientId, row.Content, row.SentAt, row.ReadAt, row.AttachmentName, row.AttachmentContentType, attachmentUrl = (string?)null, replyTo, reactions = Array.Empty<object>() };
+        var payload = new { row.Id, row.SenderId, row.RecipientId, row.Content, row.SentAt, row.ReadAt, row.AttachmentName, row.AttachmentContentType, attachmentUrl = (string?)null, replyTo, reactions = Array.Empty<object>(), request.ClientMessageId };
         await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("MessageReceived", payload);
         if (!muted) await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "message", targetKind = "person", targetId = UserId });
         await hub.Clients.Group(ChatHub.UserGroup(UserId)).SendAsync("MessageSent", payload);
@@ -184,7 +184,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
         if (item is null) return NotFound();
         return File(item.AttachmentData!, item.AttachmentContentType ?? "application/octet-stream", item.AttachmentName);
     }
-    public record MessageRequest(string Content, long? ReplyToId = null);
+    public record MessageRequest(string Content, long? ReplyToId = null, string? ClientMessageId = null);
     public record ReactionRequest(string Emoji);
     public record PreferenceRequest(bool Muted);
     public record RecentConversation(string Kind, int Id, string Name, string Preview, DateTime ActivityAt, int MemberCount);
