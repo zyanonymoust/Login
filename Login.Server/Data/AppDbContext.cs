@@ -17,6 +17,8 @@ public class AppDbContext : DbContext
     public DbSet<GroupMember> GroupMembers { get; set; }
     public DbSet<GroupChatMessage> GroupMessages { get; set; }
     public DbSet<Notification> Notifications { get; set; }
+    public DbSet<MessageReaction> MessageReactions { get; set; }
+    public DbSet<ConversationPreference> ConversationPreferences { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +32,7 @@ public class AppDbContext : DbContext
                 entity.Property(user => user.Name).HasMaxLength(100).IsRequired();
                 entity.Property(user => user.Email).HasMaxLength(255).IsRequired();
                 entity.Property(user => user.PasswordHash).IsRequired();
+                entity.Property(user => user.AvatarContentType).HasMaxLength(40);
                 entity.HasMany(user => user.Tasks)
                       .WithOne(task => task.User)
                       .HasForeignKey(task => task.UserId)
@@ -65,6 +68,7 @@ public class AppDbContext : DbContext
             entity.Property(x => x.AttachmentContentType).HasMaxLength(120);
             entity.HasOne(x => x.Sender).WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Recipient).WithMany().HasForeignKey(x => x.RecipientId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.ReplyTo).WithMany(x => x.Replies).HasForeignKey(x => x.ReplyToId).OnDelete(DeleteBehavior.SetNull);
         });
         modelBuilder.Entity<GroupRoom>(entity =>
         {
@@ -93,6 +97,21 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Body).HasMaxLength(500).IsRequired();
             entity.Property(x => x.TargetKind).HasMaxLength(30).IsRequired();
             entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<MessageReaction>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.MessageId, x.UserId, x.Emoji }).IsUnique();
+            entity.Property(x => x.Emoji).HasMaxLength(16).IsRequired();
+            entity.HasOne(x => x.Message).WithMany(x => x.Reactions).HasForeignKey(x => x.MessageId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<ConversationPreference>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.UserId, x.OtherUserId }).IsUnique();
+            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.OtherUser).WithMany().HasForeignKey(x => x.OtherUserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

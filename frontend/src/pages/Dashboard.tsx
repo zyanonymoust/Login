@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { SubmitEvent, ChangeEvent } from "react";
 import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
+import type { HubConnection } from "@microsoft/signalr";
 import { useNavigate } from "react-router";
 import { API_BASE_URL, apiRequest } from "../services/api";
 import { logout } from "../services/auth";
@@ -17,6 +18,7 @@ type Person = {
   friendshipStatus?: string;
   incoming: boolean;
   unread: number;
+  avatarUrl?: string;
 };
 type Message = {
   id: number;
@@ -25,9 +27,12 @@ type Message = {
   content: string;
   sentAt: string;
   readAt?: string;
+  isUnread?: boolean;
   attachmentName?: string;
   attachmentContentType?: string;
   attachmentUrl?: string;
+  replyTo?: { id: number; senderId: number; content: string; attachmentName?: string };
+  reactions?: { emoji: string; count: number; reactedByMe?: boolean }[];
 };
 type Me = {
   id?: number;
@@ -36,12 +41,15 @@ type Me = {
   email: string;
   bio?: string;
   status?: string;
+  avatarUrl?: string;
 };
 type RecentConversation = { kind: "person" | "group"; id: number; name: string; preview: string; activityAt: string; memberCount: number };
 type AppNotification = { id: number; type: string; title: string; body: string; targetKind: "person" | "group"; targetId: number; isRead: boolean; createdAt: string };
 export type GroupRoom = { id:number; name:string; description:string; isPublic:boolean; status:string; role:string; isMuted:boolean; doNotDisturb:boolean; memberCount:number; invitedBy:string; createdAt:string };
 export default function Dashboard() {
-  const fileInput = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null),
+    chatHubRef = useRef<HubConnection | null>(null),
+    autoAwayRef = useRef(false);
   const nav = useNavigate(),
     [me, setMe] = useState<Me>(() =>
       JSON.parse(localStorage.getItem("user") || "{}"),
@@ -50,6 +58,10 @@ export default function Dashboard() {
     [selected, setSelected] = useState<Person | null>(null),
     [messages, setMessages] = useState<Message[]>([]),
     [messageDetails, setMessageDetails] = useState<Message | null>(null),
+    [replyingTo, setReplyingTo] = useState<Message | null>(null),
+    [isTyping, setIsTyping] = useState(false),
+    [conversationMuted, setConversationMuted] = useState(false),
+    [chatSearch, setChatSearch] = useState(""),
     [draft, setDraft] = useState(""),
     [uploading, setUploading] = useState(false),
     [groupRooms, setGroupRooms] = useState<GroupRoom[]>([]),
@@ -66,6 +78,9 @@ export default function Dashboard() {
     ),
     [darkMode, setDarkMode] = useState(
       () => localStorage.getItem("woven-dark") === "on",
+    ),
+    [desktopNotifications, setDesktopNotifications] = useState(
+      () => localStorage.getItem("woven-desktop-notifications") === "on",
     ),
     [chatBg, setChatBg] = useState(
       () => localStorage.getItem("woven-chat-bg") || "default",
@@ -114,6 +129,10 @@ export default function Dashboard() {
       a = false;
     };
   }, [selected]);
+  useEffect(() => {
+    if (!selected) return;
+    apiRequest<{ muted: boolean }>(`/api/messages/${selected.id}/preference`).then((result) => setConversationMuted(result.muted)).catch(() => setConversationMuted(false));
+  }, [selected]);
   useEffect(() => localStorage.setItem("woven-theme", theme), [theme]);
   useEffect(() => localStorage.setItem("woven-dark", darkMode ? "on" : "off"), [darkMode]);
   useEffect(() => localStorage.setItem("woven-chat-bg", chatBg), [chatBg]);
@@ -139,6 +158,30 @@ export default function Dashboard() {
     };
   }, [pointerEffect]);
   useEffect(() => {
+    let timer = me.status === "Available" ? window.setTimeout(setAway, 300000) : 0;
+    async function setAway() {
+      const result = await apiRequest<{ status: string }>("/api/social/status", { method: "PUT", body: JSON.stringify({ status: "Away" }) }).catch(() => null);
+      if (!result) return;
+      autoAwayRef.current = true;
+      setMe((current) => ({ ...current, status: result.status }));
+    }
+    async function active() {
+      window.clearTimeout(timer);
+      if (autoAwayRef.current) {
+        autoAwayRef.current = false;
+        const result = await apiRequest<{ status: string }>("/api/social/status", { method: "PUT", body: JSON.stringify({ status: "Available" }) }).catch(() => null);
+        if (result) setMe((current) => ({ ...current, status: result.status }));
+      }
+      if (me.status === "Available") timer = window.setTimeout(setAway, 300000);
+    }
+    const events = ["pointerdown", "keydown", "focus"] as const;
+    events.forEach((event) => window.addEventListener(event, active, { passive: true }));
+    return () => {
+      window.clearTimeout(timer);
+      events.forEach((event) => window.removeEventListener(event, active));
+    };
+  }, [me.status]);
+  useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
     const base = import.meta.env.VITE_API_URL || "http://localhost:5436",
@@ -157,7 +200,7 @@ export default function Dashboard() {
         selected &&
         (m.senderId === selected.id || m.recipientId === selected.id)
       )
-        setMessages((x) => (x.some((y) => y.id === m.id) ? x : [...x, m]));
+        setMessages((x) => (x.some((y) => y.id === m.id) ? x : [...x, { ...m, isUnread: true }]));
     });
     c.on("MessageSent", (m: Message) => {
       refreshRecent();
@@ -175,17 +218,41 @@ export default function Dashboard() {
           ),
         );
     });
+    c.on("MessageUpdated", (item: { id: number; content: string }) => {
+      setMessages((items) => items.map((message) => message.id === item.id ? { ...message, content: item.content } : message));
+      setMessageDetails((message) => message?.id === item.id ? { ...message, content: item.content } : message);
+    });
+    c.on("MessageDeleted", (item: { id: number }) => {
+      setMessages((items) => items.filter((message) => message.id !== item.id));
+      setMessageDetails((message) => message?.id === item.id ? null : message);
+    });
+    c.on("MessageReactionsChanged", (item: { id: number; reactions: { emoji: string; count: number }[]; userId: number; emoji: string; added: boolean }) => {
+      setMessages((messages) => messages.map((message) => message.id === item.id ? { ...message, reactions: item.reactions.map((reaction) => ({ ...reaction, reactedByMe: item.userId === (me.id || me.userId) && reaction.emoji === item.emoji ? item.added : message.reactions?.find((old) => old.emoji === reaction.emoji)?.reactedByMe })) } : message));
+    });
+    c.on("TypingChanged", (item: { userId: number; isTyping: boolean }) => {
+      if (item.userId === selected?.id) setIsTyping(item.isTyping);
+    });
     c.on("PresenceChanged", refresh);
     c.on("FriendRequestReceived", refresh);
     c.on("FriendRequestUpdated", refresh);
     c.on("GroupInviteReceived", refreshGroups);
     c.on("GroupMembershipChanged", () => { refreshGroups(); refreshRecent(); });
-    c.on("NotificationReceived", refreshNotifications);
-    c.start().catch(() => {});
+    c.on("NotificationReceived", () => {
+      refreshNotifications();
+      if (desktopNotifications && "Notification" in window && window.Notification.permission === "granted" && document.hidden) new window.Notification("Woven", { body: "You have a new notification." });
+    });
+    c.start().then(() => { chatHubRef.current = c; }).catch(() => {});
     return () => {
+      if (chatHubRef.current === c) chatHubRef.current = null;
       c.stop().catch(() => {});
     };
-  }, [selected, refresh, refreshGroups, refreshRecent, refreshNotifications]);
+  }, [selected, refresh, refreshGroups, refreshRecent, refreshNotifications, me.id, me.userId, desktopNotifications]);
+  useEffect(() => {
+    if (!selected || !chatHubRef.current) return;
+    chatHubRef.current.invoke("SendTyping", selected.id, draft.trim().length > 0).catch(() => {});
+    const timer = window.setTimeout(() => chatHubRef.current?.invoke("SendTyping", selected.id, false).catch(() => {}), 1200);
+    return () => window.clearTimeout(timer);
+  }, [draft, selected]);
   const friends = people.filter((x) => x.friendshipStatus === "accepted"),
     others = people.filter((x) => x.friendshipStatus !== "accepted"),
     incomingRequests = people.filter((x) => x.friendshipStatus === "pending" && x.incoming),
@@ -194,6 +261,7 @@ export default function Dashboard() {
     notificationCount = notifications.filter((item) => !item.isRead).length,
     choose = (p: Person) => {
       setSelected(p);
+      setReplyingTo(null);
       setView("chat");
     },
     markTargetNotifications = async (targetKind: "person" | "group", targetId: number) => {
@@ -235,6 +303,68 @@ export default function Dashboard() {
       await apiRequest("/api/notifications/read-all", { method: "POST" });
       setNotifications((items) => items.map((x) => ({ ...x, isRead: true })));
     },
+    changeStatus = async (status: string) => {
+      const result = await apiRequest<{ status: string }>("/api/social/status", { method: "PUT", body: JSON.stringify({ status }) });
+      const updated = { ...me, status: result.status };
+      setMe(updated);
+      localStorage.setItem("user", JSON.stringify(updated));
+    },
+    toggleConversationMute = async () => {
+      if (!selected) return;
+      const result = await apiRequest<{ muted: boolean }>(`/api/messages/${selected.id}/preference`, { method: "PUT", body: JSON.stringify({ muted: !conversationMuted }) });
+      setConversationMuted(result.muted);
+    },
+    toggleDesktopNotifications = async () => {
+      if (typeof window.Notification === "undefined") { window.alert("Desktop notifications are not supported by this browser."); return; }
+      if (!desktopNotifications) {
+        const permission = await window.Notification.requestPermission();
+        if (permission !== "granted") return;
+      }
+      const enabled = !desktopNotifications;
+      setDesktopNotifications(enabled);
+      localStorage.setItem("woven-desktop-notifications", enabled ? "on" : "off");
+    },
+    editMessage = async (message: Message) => {
+      const content = window.prompt("Edit message", message.content);
+      if (content === null || !content.trim() || content.trim() === message.content) return;
+      const updated = await apiRequest<{ id: number; content: string }>(`/api/messages/item/${message.id}`, { method: "PUT", body: JSON.stringify({ content }) });
+      setMessages((items) => items.map((item) => item.id === updated.id ? { ...item, content: updated.content } : item));
+      setMessageDetails((item) => item?.id === updated.id ? { ...item, content: updated.content } : item);
+    },
+    deleteMessage = async (message: Message) => {
+      if (!window.confirm("Delete this message for both people?")) return;
+      await apiRequest(`/api/messages/item/${message.id}`, { method: "DELETE" });
+      setMessages((items) => items.filter((item) => item.id !== message.id));
+      setMessageDetails(null);
+    },
+    uploadAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const body = new FormData(); body.append("file", file);
+      const response = await fetch(`${API_BASE_URL}/api/social/avatar`, { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }, body });
+      if (!response.ok) { window.alert("Choose a PNG, JPEG, or WebP image smaller than 2 MB."); return; }
+      const result = await response.json() as { avatarUrl: string };
+      setMe((current) => ({ ...current, avatarUrl: result.avatarUrl }));
+      event.target.value = "";
+    },
+    deleteAvatar = async () => {
+      await apiRequest("/api/social/avatar", { method: "DELETE" });
+      setMe((current) => ({ ...current, avatarUrl: undefined }));
+    },
+    changePassword = async (event: SubmitEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      await apiRequest("/api/social/password", { method: "PUT", body: JSON.stringify({ currentPassword: form.get("currentPassword"), newPassword: form.get("newPassword"), confirmPassword: form.get("confirmPassword") }) });
+      event.currentTarget.reset();
+      window.alert("Password changed successfully.");
+    },
+    replyToMessage = (message: Message) => {
+      setReplyingTo(message);
+      setMessageDetails(null);
+    },
+    reactToMessage = async (message: Message, emoji: string) => {
+      await apiRequest(`/api/messages/item/${message.id}/reactions`, { method: "POST", body: JSON.stringify({ emoji }) });
+    },
     send = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!selected || !draft.trim()) return;
@@ -242,8 +372,9 @@ export default function Dashboard() {
       setDraft("");
       await apiRequest(`/api/messages/${selected.id}`, {
         method: "POST",
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, replyToId: replyingTo?.id }),
       });
+      setReplyingTo(null);
       setMessages(await apiRequest<Message[]>(`/api/messages/${selected.id}`));
       refreshRecent();
     },
@@ -302,6 +433,7 @@ export default function Dashboard() {
         e.target.value = "";
       }
     };
+  const firstUnreadId = messages.find((message) => message.isUnread)?.id;
   return (
     <div className={`woven-app theme-${theme} ${darkMode ? "dark" : ""}`}>
       <aside className="app-sidebar">
@@ -380,12 +512,14 @@ export default function Dashboard() {
           add={add}
         />
         <div className="my-card">
-          <Avatar name={me.name} />
+          <Avatar name={me.name} avatarUrl={me.avatarUrl} />
           <span>
             <strong>{me.name || "You"}</strong>
-            <small>{me.status || "Available"}</small>
+            <select className="my-status-select" value={me.status || "Available"} onChange={(event) => changeStatus(event.target.value)} aria-label="Your status">
+              <option value="Available">Available</option><option value="Busy">Busy</option><option value="Away">Away</option><option value="Do Not Disturb">Do Not Disturb</option><option value="Invisible">Invisible</option>
+            </select>
           </span>
-          <i className="online-dot" />
+          <i className={me.status === "Invisible" ? "offline-dot" : "online-dot"} />
         </div>
       </section>
       <main className="app-main">
@@ -408,13 +542,13 @@ export default function Dashboard() {
             <button onClick={() => setNotice(!notice)}>
               ♢{notificationCount > 0 && <b>{notificationCount}</b>}
                       </button>
-            <Avatar name={me.name} />
+            <Avatar name={me.name} avatarUrl={me.avatarUrl} />
             {notice && (
               <div className="notice-pop">
                 <div className="notice-heading"><strong>Notifications</strong>{notificationCount > 0 && <button onClick={readAllNotifications}>Mark all read</button>}</div>
                 {incomingRequests.map((x) => (
                   <div className="friend-notice" key={`friend-${x.id}`}>
-                    <Avatar name={x.name} />
+                    <Avatar name={x.name} avatarUrl={x.avatarUrl} />
                     <span><strong>{x.name}</strong><small>wants to be your friend</small></span>
                     <div><button onClick={() => acceptFriend(x)}>Accept</button><button className="decline" onClick={() => declineFriend(x)}>Decline</button></div>
                   </div>
@@ -506,7 +640,7 @@ export default function Dashboard() {
             }
           >
             <div className="chat-meta">
-              <Avatar name={selected.name} />
+              <Avatar name={selected.name} avatarUrl={selected.avatarUrl} />
               <span>
                 <strong>{selected.name}</strong>
                 <small>
@@ -516,6 +650,8 @@ export default function Dashboard() {
                   {selected.online ? "Online now" : selected.status}
                 </small>
               </span>
+              <label className="chat-search"><span>⌕</span><input value={chatSearch} onChange={(event) => setChatSearch(event.target.value)} placeholder="Search messages" /></label>
+              <button className="conversation-mute" onClick={toggleConversationMute} title={conversationMuted ? "Turn notifications on" : "Mute notifications"}>{conversationMuted ? "🔕" : "🔔"}</button>
             </div>
             {selected.friendshipStatus !== "accepted" && (
               <div className="friend-tip">
@@ -527,17 +663,18 @@ export default function Dashboard() {
             <div className="message-list">
               {!messages.length && (
                 <div className="start-chat">
-                  <Avatar name={selected.name} />
+                  <Avatar name={selected.name} avatarUrl={selected.avatarUrl} />
                   <h3>Start something good</h3>
                   <p>Say hello to {selected.name}.</p>
                 </div>
               )}
-              {messages.map((m, index) => {
+              {messages.filter((message) => !chatSearch.trim() || message.content.toLowerCase().includes(chatSearch.trim().toLowerCase()) || message.attachmentName?.toLowerCase().includes(chatSearch.trim().toLowerCase())).map((m, index, visibleMessages) => {
                 const day = new Date(m.sentAt),
-                  previousDay = index > 0 ? new Date(messages[index - 1].sentAt) : null,
+                  previousDay = index > 0 ? new Date(visibleMessages[index - 1].sentAt) : null,
                   startsDay = !previousDay || day.toDateString() !== previousDay.toDateString();
                 return (
                   <Fragment key={m.id}>
+                    {m.id === firstUnreadId && <div className="unread-separator"><span>New messages</span></div>}
                     {startsDay && <div className="date-separator"><span>{chatDateLabel(day)}</span></div>}
                     <div
                       className={`message ${m.senderId === (me.id || me.userId) ? "mine" : "theirs"}`}
@@ -547,8 +684,10 @@ export default function Dashboard() {
                       tabIndex={0}
                       title="Double-click for message details"
                     >
+                      {m.replyTo && <div className="message-reply"><strong>{m.replyTo.senderId === (me.id || me.userId) ? "You" : selected.name}</strong><span>{m.replyTo.content || m.replyTo.attachmentName || "Attachment"}</span></div>}
                       <p>{m.content}</p>
                       {m.attachmentUrl && <MessageAttachment message={m} />}
+                      {!!m.reactions?.length && <div className="message-reactions">{m.reactions.map((reaction) => <button className={reaction.reactedByMe ? "mine" : ""} key={reaction.emoji} onClick={(event) => { event.stopPropagation(); reactToMessage(m, reaction.emoji); }}>{reaction.emoji} {reaction.count}</button>)}</div>}
                       {m.senderId === (me.id || me.userId) && (
                         <small>
                           {day.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -562,7 +701,9 @@ export default function Dashboard() {
                 );
               })}
             </div>
+            {isTyping && <div className="typing-indicator"><i /><i /><i /><span>{selected.name} is typing</span></div>}
             <form className="composer" onSubmit={send}>
+              {replyingTo && <div className="replying-preview"><span><strong>Replying to {replyingTo.senderId === (me.id || me.userId) ? "yourself" : selected.name}</strong><small>{replyingTo.content || replyingTo.attachmentName || "Attachment"}</small></span><button type="button" onClick={() => setReplyingTo(null)} aria-label="Cancel reply">×</button></div>}
               <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading} title="Add image or file">{uploading ? "…" : "＋"}</button>
               <input ref={fileInput} className="attachment-input" type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onChange={sendAttachment} />
               <input
@@ -579,25 +720,28 @@ export default function Dashboard() {
                   <span className="message-detail-icon">✓✓</span>
                   <h3>Message details</h3>
                   <p>{messageDetails.content || messageDetails.attachmentName || "Attachment"}</p>
+                  <div className="reaction-picker">{["👍", "❤️", "😂", "😮", "😢", "🎉"].map((emoji) => <button key={emoji} onClick={() => reactToMessage(messageDetails, emoji)}>{emoji}</button>)}</div>
                   <dl>
                     <div><dt>Sent</dt><dd>{formatMessageDateTime(messageDetails.sentAt)}</dd></div>
                     <div><dt>Received</dt><dd>{formatMessageDateTime(messageDetails.sentAt)}</dd></div>
                     <div><dt>Read</dt><dd>{messageDetails.readAt ? formatMessageDateTime(messageDetails.readAt) : "Not read yet"}</dd></div>
                   </dl>
+                  <div className="message-detail-actions"><button onClick={() => replyToMessage(messageDetails)}>Reply</button>{messageDetails.senderId === (me.id || me.userId) && <><button onClick={() => editMessage(messageDetails)}>Edit message</button><button className="danger" onClick={() => deleteMessage(messageDetails)}>Delete message</button></>}</div>
                 </section>
               </div>
             )}
           </section>
         )}
-        {view === "profile" && (
+        {view === "profile" && (<section className="profile-page">
           <form className="settings-view" onSubmit={save}>
             <div className="profile-edit">
-              <Avatar name={me.name} />
+              <Avatar name={me.name} avatarUrl={me.avatarUrl} />
               <div>
                 <h3>Your profile</h3>
                 <p>What friends see across Woven.</p>
               </div>
             </div>
+            <div className="avatar-actions"><label>Upload avatar<input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadAvatar} /></label>{me.avatarUrl && <button type="button" onClick={deleteAvatar}>Remove avatar</button>}</div>
             <label>
               Display name
               <input name="name" defaultValue={me.name} required />
@@ -609,6 +753,7 @@ export default function Dashboard() {
                 <option value="Busy">Busy</option>
                 <option value="Away">Away</option>
                 <option value="Do Not Disturb">Do Not Disturb</option>
+                <option value="Invisible">Invisible</option>
               </select>
             </label>
             <label>
@@ -621,7 +766,8 @@ export default function Dashboard() {
             </label>
             <button className="save">Save changes</button>
           </form>
-        )}
+          <form className="settings-view password-settings" onSubmit={changePassword}><h3>Change password</h3><label>Current password<input name="currentPassword" type="password" required /></label><label>New password<input name="newPassword" type="password" minLength={6} required /></label><label>Confirm new password<input name="confirmPassword" type="password" minLength={6} required /></label><button className="save">Change password</button></form>
+        </section>)}
         {view === "settings" && (
           <section className="settings-view">
             <h3>Choose your color</h3>
@@ -642,6 +788,9 @@ export default function Dashboard() {
               <span>{darkMode ? "☀" : "☾"}</span>
               <div><strong>{darkMode ? "Use light mode" : "Use dark mode"}</strong><small>Switch the complete dashboard appearance.</small></div>
               <i className={darkMode ? "enabled" : ""} />
+            </button>
+            <button className="dark-mode-setting" onClick={toggleDesktopNotifications}>
+              <span>🔔</span><div><strong>Desktop notifications</strong><small>Show a notification when Woven is in the background.</small></div><i className={desktopNotifications ? "enabled" : ""} />
             </button>
             <div className="pointer-settings">
               <h3>Pointer style</h3>
@@ -697,7 +846,8 @@ export default function Dashboard() {
     </div>
   );
 }
-function Avatar({ name }: { name: string }) {
+function Avatar({ name, avatarUrl }: { name: string; avatarUrl?: string }) {
+  if (avatarUrl) return <div className="avatar"><img src={`${API_BASE_URL}${avatarUrl}`} alt={`${name} avatar`} /></div>;
   return (
     <div className="avatar">
       {(name || "?")
@@ -741,7 +891,8 @@ function updateActivityStreak() {
 }
 
 function MessageAttachment({ message }: { message: Message }) {
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(""),
+    [preview, setPreview] = useState(false);
   useEffect(() => {
     let objectUrl = "";
     fetch(`${API_BASE_URL}${message.attachmentUrl}`, {
@@ -761,7 +912,7 @@ function MessageAttachment({ message }: { message: Message }) {
 
   const image = message.attachmentContentType?.startsWith("image/");
   if (!url) return <div className="attachment-loading">Loading attachment…</div>;
-  if (image) return <a className="image-attachment" href={url} download={message.attachmentName}><img src={url} alt={message.attachmentName || "Shared image"} /><span>{message.attachmentName}</span></a>;
+  if (image) return <><button type="button" className="image-attachment" onClick={() => setPreview(true)}><img src={url} alt={message.attachmentName || "Shared image"} /><span>{message.attachmentName}</span></button>{preview && <div className="image-preview-backdrop" onClick={() => setPreview(false)}><section className="image-preview-card" onClick={(event) => event.stopPropagation()}><button className="image-preview-close" onClick={() => setPreview(false)}>×</button><img src={url} alt={message.attachmentName || "Shared image"} /><footer><span>{message.attachmentName}</span><a href={url} download={message.attachmentName}>Download</a></footer></section></div>}</>;
   return <a className="file-attachment" href={url} download={message.attachmentName}><b>📎</b><span><strong>{message.attachmentName}</strong><small>Click to download</small></span></a>;
 }
 
@@ -909,7 +1060,7 @@ function Group({
         >
           <button className="person-main" onClick={() => choose(p)}>
             <span className="avatar-wrap">
-              <Avatar name={p.name} />
+              <Avatar name={p.name} avatarUrl={p.avatarUrl} />
               <i className={p.online ? "online-dot" : "offline-dot"} />
             </span>
             <span>

@@ -24,6 +24,12 @@ public class ChatHub(AppDbContext db) : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, RoomGroup(roomId));
     }
 
+    public async Task SendTyping(int otherUserId, bool isTyping)
+    {
+        if (otherUserId == CurrentUserId || !await db.Users.AnyAsync(x => x.Id == otherUserId)) return;
+        await Clients.Group(UserGroup(otherUserId)).SendAsync("TypingChanged", new { userId = CurrentUserId, isTyping });
+    }
+
     public async Task JoinMeeting(int roomId)
     {
         if (!await CanEnter(roomId)) throw new HubException("Meeting access denied.");

@@ -95,3 +95,20 @@ The Jenkin pipeline automatically:
 5. Waits for tthe frontend
 6. Runs Playwright E2E tests
 
+## Railway Production Variables
+
+Set these variables on the .NET service:
+
+```text
+ASPNETCORE_ENVIRONMENT=Production
+ConnectionStrings__logindb=<Railway PostgreSQL connection string>
+Jwt__Issuer=Login.Server
+Jwt__Audience=Login.Frontend
+Jwt__Key=<long random production secret>
+Frontend__AllowedOrigins__0=https://<your-frontend-domain>
+```
+
+The server applies Entity Framework migrations during startup. Back up the production database before deploying a release that contains new migrations. The API uses a global per-user/IP rate limit, a stricter authentication limit, and only permits configured frontend origins.
+
+Jenkins uses the `login-app` Compose project only for E2E testing and removes that stack afterward, preventing duplicate local containers.
+

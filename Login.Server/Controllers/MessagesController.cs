@@ -55,7 +55,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
     public async Task<IActionResult> Conversation(int otherId, [FromQuery] long after = 0)
     {
         var me = UserId;
-        var rows = await db.Messages.Where(x => x.Id > after && ((x.SenderId == me && x.RecipientId == otherId) || (x.SenderId == otherId && x.RecipientId == me))).OrderBy(x => x.Id).Take(200).Select(x => new { x.Id, x.SenderId, x.RecipientId, x.Content, x.SentAt, x.ReadAt, x.AttachmentName, x.AttachmentContentType, attachmentUrl = x.AttachmentData != null ? $"/api/messages/attachment/{x.Id}" : null }).ToListAsync();
+        var rows = await db.Messages.Where(x => x.Id > after && ((x.SenderId == me && x.RecipientId == otherId) || (x.SenderId == otherId && x.RecipientId == me))).OrderBy(x => x.Id).Take(200).Select(x => new { x.Id, x.SenderId, x.RecipientId, x.Content, x.SentAt, x.ReadAt, isUnread = x.SenderId == otherId && x.RecipientId == me && x.ReadAt == null, x.AttachmentName, x.AttachmentContentType, attachmentUrl = x.AttachmentData != null ? $"/api/messages/attachment/{x.Id}" : null, replyTo = x.ReplyTo == null ? null : new { x.ReplyTo.Id, x.ReplyTo.SenderId, x.ReplyTo.Content, x.ReplyTo.AttachmentName }, reactions = x.Reactions.GroupBy(r => r.Emoji).Select(g => new { emoji = g.Key, count = g.Count(), reactedByMe = g.Any(r => r.UserId == me) }) }).ToListAsync();
         var readCount = await db.Messages.Where(x => x.SenderId == otherId && x.RecipientId == me && x.ReadAt == null).ExecuteUpdateAsync(s => s.SetProperty(x => x.ReadAt, DateTime.UtcNow));
         if (readCount > 0) await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("MessagesRead", new { readBy = me, readAt = DateTime.UtcNow });
         return Ok(rows);
@@ -66,16 +66,88 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
     {
         var content = request.Content.Trim(); if (content.Length is < 1 or > 4000) return BadRequest(new { message = "Message must be between 1 and 4000 characters." });
         if (!await db.Users.AnyAsync(x => x.Id == otherId)) return NotFound();
+        var replyTo = request.ReplyToId.HasValue
+            ? await db.Messages.AsNoTracking().Where(x => x.Id == request.ReplyToId && ((x.SenderId == UserId && x.RecipientId == otherId) || (x.SenderId == otherId && x.RecipientId == UserId))).Select(x => new { x.Id, x.SenderId, x.Content, x.AttachmentName }).FirstOrDefaultAsync()
+            : null;
+        if (request.ReplyToId.HasValue && replyTo is null) return BadRequest(new { message = "The replied message is not part of this conversation." });
         var senderName = await db.Users.Where(x => x.Id == UserId).Select(x => x.Name).SingleAsync();
-        var row = new ChatMessage { SenderId = UserId, RecipientId = otherId, Content = content };
+        var row = new ChatMessage { SenderId = UserId, RecipientId = otherId, Content = content, ReplyToId = replyTo?.Id };
         db.Messages.Add(row);
-        db.Notifications.Add(new Notification { UserId = otherId, Type = "message", Title = senderName, Body = content, TargetKind = "person", TargetId = UserId });
+        var muted = await db.ConversationPreferences.AnyAsync(x => x.UserId == otherId && x.OtherUserId == UserId && x.IsMuted);
+        if (!muted) db.Notifications.Add(new Notification { UserId = otherId, Type = "message", Title = senderName, Body = content, TargetKind = "person", TargetId = UserId });
         await db.SaveChangesAsync();
-        var payload = new { row.Id, row.SenderId, row.RecipientId, row.Content, row.SentAt, row.ReadAt, row.AttachmentName, row.AttachmentContentType, attachmentUrl = (string?)null };
+        var payload = new { row.Id, row.SenderId, row.RecipientId, row.Content, row.SentAt, row.ReadAt, row.AttachmentName, row.AttachmentContentType, attachmentUrl = (string?)null, replyTo, reactions = Array.Empty<object>() };
         await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("MessageReceived", payload);
-        await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "message", targetKind = "person", targetId = UserId });
+        if (!muted) await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "message", targetKind = "person", targetId = UserId });
         await hub.Clients.Group(ChatHub.UserGroup(UserId)).SendAsync("MessageSent", payload);
         return Ok(payload);
+    }
+
+    [HttpPut("item/{messageId:long}")]
+    public async Task<IActionResult> Edit(long messageId, MessageRequest request)
+    {
+        var content = request.Content.Trim();
+        if (content.Length is < 1 or > 4000) return BadRequest(new { message = "Message must be between 1 and 4000 characters." });
+        var row = await db.Messages.FirstOrDefaultAsync(x => x.Id == messageId && x.SenderId == UserId);
+        if (row is null) return NotFound(new { message = "Message not found or cannot be edited." });
+        row.Content = content;
+        await db.SaveChangesAsync();
+        var payload = new { row.Id, row.Content };
+        await hub.Clients.Group(ChatHub.UserGroup(row.SenderId)).SendAsync("MessageUpdated", payload);
+        await hub.Clients.Group(ChatHub.UserGroup(row.RecipientId)).SendAsync("MessageUpdated", payload);
+        return Ok(payload);
+    }
+
+    [HttpDelete("item/{messageId:long}")]
+    public async Task<IActionResult> Delete(long messageId)
+    {
+        var row = await db.Messages.FirstOrDefaultAsync(x => x.Id == messageId && x.SenderId == UserId);
+        if (row is null) return NotFound(new { message = "Message not found or cannot be deleted." });
+        var senderId = row.SenderId;
+        var recipientId = row.RecipientId;
+        db.Messages.Remove(row);
+        await db.SaveChangesAsync();
+        await hub.Clients.Group(ChatHub.UserGroup(senderId)).SendAsync("MessageDeleted", new { id = messageId });
+        await hub.Clients.Group(ChatHub.UserGroup(recipientId)).SendAsync("MessageDeleted", new { id = messageId });
+        return NoContent();
+    }
+
+    [HttpPost("item/{messageId:long}/reactions")]
+    public async Task<IActionResult> ToggleReaction(long messageId, ReactionRequest request)
+    {
+        var allowed = new[] { "👍", "❤️", "😂", "😮", "😢", "🎉" };
+        if (!allowed.Contains(request.Emoji)) return BadRequest(new { message = "Choose a supported reaction." });
+        var message = await db.Messages.AsNoTracking().FirstOrDefaultAsync(x => x.Id == messageId && (x.SenderId == UserId || x.RecipientId == UserId));
+        if (message is null) return NotFound();
+        var existing = await db.MessageReactions.FirstOrDefaultAsync(x => x.MessageId == messageId && x.UserId == UserId && x.Emoji == request.Emoji);
+        var added = existing is null;
+        if (added) db.MessageReactions.Add(new MessageReaction { MessageId = messageId, UserId = UserId, Emoji = request.Emoji });
+        else db.MessageReactions.Remove(existing!);
+        await db.SaveChangesAsync();
+        var reactions = await db.MessageReactions.AsNoTracking().Where(x => x.MessageId == messageId).GroupBy(x => x.Emoji).Select(g => new { emoji = g.Key, count = g.Count() }).ToListAsync();
+        var payload = new { id = messageId, reactions, userId = UserId, emoji = request.Emoji, added };
+        await hub.Clients.Group(ChatHub.UserGroup(message.SenderId)).SendAsync("MessageReactionsChanged", payload);
+        await hub.Clients.Group(ChatHub.UserGroup(message.RecipientId)).SendAsync("MessageReactionsChanged", payload);
+        return Ok(payload);
+    }
+
+    [HttpGet("{otherId:int}/preference")]
+    public async Task<IActionResult> Preference(int otherId)
+    {
+        if (!await db.Users.AnyAsync(x => x.Id == otherId)) return NotFound();
+        var muted = await db.ConversationPreferences.AsNoTracking().Where(x => x.UserId == UserId && x.OtherUserId == otherId).Select(x => x.IsMuted).FirstOrDefaultAsync();
+        return Ok(new { muted });
+    }
+
+    [HttpPut("{otherId:int}/preference")]
+    public async Task<IActionResult> SetPreference(int otherId, PreferenceRequest request)
+    {
+        if (otherId == UserId || !await db.Users.AnyAsync(x => x.Id == otherId)) return BadRequest();
+        var preference = await db.ConversationPreferences.FirstOrDefaultAsync(x => x.UserId == UserId && x.OtherUserId == otherId);
+        if (preference is null) db.ConversationPreferences.Add(new ConversationPreference { UserId = UserId, OtherUserId = otherId, IsMuted = request.Muted });
+        else preference.IsMuted = request.Muted;
+        await db.SaveChangesAsync();
+        return Ok(new { muted = request.Muted });
     }
 
     [HttpPost("{otherId:int}/attachment")]
@@ -94,11 +166,12 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
         var senderName = await db.Users.Where(x => x.Id == UserId).Select(x => x.Name).SingleAsync();
         var row = new ChatMessage { SenderId = UserId, RecipientId = otherId, Content = safeCaption, AttachmentName = safeName, AttachmentContentType = file.ContentType, AttachmentData = stream.ToArray() };
         db.Messages.Add(row);
-        db.Notifications.Add(new Notification { UserId = otherId, Type = "message", Title = senderName, Body = safeCaption.Length > 0 ? safeCaption : $"Sent {safeName}", TargetKind = "person", TargetId = UserId });
+        var muted = await db.ConversationPreferences.AnyAsync(x => x.UserId == otherId && x.OtherUserId == UserId && x.IsMuted);
+        if (!muted) db.Notifications.Add(new Notification { UserId = otherId, Type = "message", Title = senderName, Body = safeCaption.Length > 0 ? safeCaption : $"Sent {safeName}", TargetKind = "person", TargetId = UserId });
         await db.SaveChangesAsync();
         var payload = new { row.Id, row.SenderId, row.RecipientId, row.Content, row.SentAt, row.ReadAt, row.AttachmentName, row.AttachmentContentType, attachmentUrl = $"/api/messages/attachment/{row.Id}" };
         await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("MessageReceived", payload);
-        await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "message", targetKind = "person", targetId = UserId });
+        if (!muted) await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "message", targetKind = "person", targetId = UserId });
         await hub.Clients.Group(ChatHub.UserGroup(UserId)).SendAsync("MessageSent", payload);
         return Ok(payload);
     }
@@ -111,6 +184,8 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
         if (item is null) return NotFound();
         return File(item.AttachmentData!, item.AttachmentContentType ?? "application/octet-stream", item.AttachmentName);
     }
-    public record MessageRequest(string Content);
+    public record MessageRequest(string Content, long? ReplyToId = null);
+    public record ReactionRequest(string Emoji);
+    public record PreferenceRequest(bool Muted);
     public record RecentConversation(string Kind, int Id, string Name, string Preview, DateTime ActivityAt, int MemberCount);
 }

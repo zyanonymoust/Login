@@ -3,6 +3,7 @@ using System;
 using Login.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Login.Server.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260827044323_MessageReplies")]
+    partial class MessageReplies
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -70,33 +73,6 @@ namespace Login.Server.Data.Migrations
                     b.HasIndex("SenderId", "RecipientId", "SentAt");
 
                     b.ToTable("Messages");
-                });
-
-            modelBuilder.Entity("Login.Server.Models.ConversationPreference", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("IsMuted")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("OtherUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OtherUserId");
-
-                    b.HasIndex("UserId", "OtherUserId")
-                        .IsUnique();
-
-                    b.ToTable("ConversationPreferences");
                 });
 
             modelBuilder.Entity("Login.Server.Models.Friendship", b =>
@@ -239,38 +215,6 @@ namespace Login.Server.Data.Migrations
                     b.ToTable("GroupRooms");
                 });
 
-            modelBuilder.Entity("Login.Server.Models.MessageReaction", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Emoji")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<long>("MessageId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("MessageId", "UserId", "Emoji")
-                        .IsUnique();
-
-                    b.ToTable("MessageReactions");
-                });
-
             modelBuilder.Entity("Login.Server.Models.Notification", b =>
                 {
                     b.Property<long>("Id")
@@ -382,13 +326,6 @@ namespace Login.Server.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("AvatarContentType")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<byte[]>("AvatarData")
-                        .HasColumnType("bytea");
-
                     b.Property<string>("Bio")
                         .IsRequired()
                         .HasMaxLength(160)
@@ -451,25 +388,6 @@ namespace Login.Server.Data.Migrations
                     b.Navigation("ReplyTo");
 
                     b.Navigation("Sender");
-                });
-
-            modelBuilder.Entity("Login.Server.Models.ConversationPreference", b =>
-                {
-                    b.HasOne("Login.Server.Models.User", "OtherUser")
-                        .WithMany()
-                        .HasForeignKey("OtherUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Login.Server.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("OtherUser");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Login.Server.Models.Friendship", b =>
@@ -540,25 +458,6 @@ namespace Login.Server.Data.Migrations
                     b.Navigation("CreatedBy");
                 });
 
-            modelBuilder.Entity("Login.Server.Models.MessageReaction", b =>
-                {
-                    b.HasOne("Login.Server.Models.ChatMessage", "Message")
-                        .WithMany("Reactions")
-                        .HasForeignKey("MessageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Login.Server.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Message");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Login.Server.Models.Notification", b =>
                 {
                     b.HasOne("Login.Server.Models.User", "User")
@@ -583,8 +482,6 @@ namespace Login.Server.Data.Migrations
 
             modelBuilder.Entity("Login.Server.Models.ChatMessage", b =>
                 {
-                    b.Navigation("Reactions");
-
                     b.Navigation("Replies");
                 });
 

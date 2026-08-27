@@ -30,6 +30,11 @@ public class User
 
     public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
 
+    public byte[]? AvatarData { get; set; }
+
+    [MaxLength(40)]
+    public string? AvatarContentType { get; set; }
+
     [JsonIgnore]
     public List<TaskItem> Tasks { get; set; } = [];
 }

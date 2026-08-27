@@ -6,11 +6,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Login.Server.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
     private readonly AppDbContext _db;
@@ -137,6 +139,7 @@ public class AuthController : ControllerBase
                 user.Email,
                 user.Bio,
                 user.Status,
+                avatarUrl = user.AvatarData != null ? $"/api/social/avatar/{user.Id}" : null,
                 user.CreatedAt
             })
             .FirstOrDefaultAsync();

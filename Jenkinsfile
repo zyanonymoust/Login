@@ -30,12 +30,13 @@ pipeline {
             steps {
                 dir('frontend') {
                     bat 'npm.cmd ci'
+                    bat 'npm.cmd run lint'
                     bat 'npm.cmd run build'
                 }
             }
         }
 
-        stage('Docker Deploy') {
+        stage('Docker E2E Stack') {
             steps {
                 bat '"%COMPOSE_EXE%" -p login-app down --remove-orphans'
                 bat '"%COMPOSE_EXE%" -p login-app up --build -d'
@@ -61,6 +62,7 @@ pipeline {
     post {
         always {
             bat returnStatus: true, script: '"%COMPOSE_EXE%" -p login-app ps'
+            bat returnStatus: true, script: '"%COMPOSE_EXE%" -p login-app down --remove-orphans'
         }
 
         success {
