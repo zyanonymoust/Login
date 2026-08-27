@@ -66,10 +66,14 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
     {
         var content = request.Content.Trim(); if (content.Length is < 1 or > 4000) return BadRequest(new { message = "Message must be between 1 and 4000 characters." });
         if (!await db.Users.AnyAsync(x => x.Id == otherId)) return NotFound();
+        var senderName = await db.Users.Where(x => x.Id == UserId).Select(x => x.Name).SingleAsync();
         var row = new ChatMessage { SenderId = UserId, RecipientId = otherId, Content = content };
-        db.Messages.Add(row); await db.SaveChangesAsync();
+        db.Messages.Add(row);
+        db.Notifications.Add(new Notification { UserId = otherId, Type = "message", Title = senderName, Body = content, TargetKind = "person", TargetId = UserId });
+        await db.SaveChangesAsync();
         var payload = new { row.Id, row.SenderId, row.RecipientId, row.Content, row.SentAt, row.ReadAt, row.AttachmentName, row.AttachmentContentType, attachmentUrl = (string?)null };
         await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("MessageReceived", payload);
+        await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "message", targetKind = "person", targetId = UserId });
         await hub.Clients.Group(ChatHub.UserGroup(UserId)).SendAsync("MessageSent", payload);
         return Ok(payload);
     }
@@ -87,10 +91,14 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
         var safeCaption = (caption ?? string.Empty).Trim();
         if (safeCaption.Length > 4000) return BadRequest(new { message = "Caption must be 4000 characters or fewer." });
         await using var stream = new MemoryStream(); await file.CopyToAsync(stream);
+        var senderName = await db.Users.Where(x => x.Id == UserId).Select(x => x.Name).SingleAsync();
         var row = new ChatMessage { SenderId = UserId, RecipientId = otherId, Content = safeCaption, AttachmentName = safeName, AttachmentContentType = file.ContentType, AttachmentData = stream.ToArray() };
-        db.Messages.Add(row); await db.SaveChangesAsync();
+        db.Messages.Add(row);
+        db.Notifications.Add(new Notification { UserId = otherId, Type = "message", Title = senderName, Body = safeCaption.Length > 0 ? safeCaption : $"Sent {safeName}", TargetKind = "person", TargetId = UserId });
+        await db.SaveChangesAsync();
         var payload = new { row.Id, row.SenderId, row.RecipientId, row.Content, row.SentAt, row.ReadAt, row.AttachmentName, row.AttachmentContentType, attachmentUrl = $"/api/messages/attachment/{row.Id}" };
         await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("MessageReceived", payload);
+        await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "message", targetKind = "person", targetId = UserId });
         await hub.Clients.Group(ChatHub.UserGroup(UserId)).SendAsync("MessageSent", payload);
         return Ok(payload);
     }

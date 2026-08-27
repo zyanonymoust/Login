@@ -46,6 +46,23 @@ public class GroupPermissionsApiTests : IClassFixture<CustomWebApplicationFactor
         Assert.Equal(HttpStatusCode.NoContent, removeResponse.StatusCode);
     }
 
+    [Fact]
+    public async Task DoNotDisturb_SuppressesGroupMessageNotification()
+    {
+        var owner = await CreateUser("Owner");
+        var member = await CreateUser("Member");
+        var roomId = await CreateGroup(owner.Client);
+        await InviteAndAccept(owner.Client, member, roomId);
+        var dnd = await member.Client.PostAsJsonAsync($"/api/groups/{roomId}/dnd", new { enabled = true });
+        dnd.EnsureSuccessStatusCode();
+
+        var message = await owner.Client.PostAsJsonAsync($"/api/groups/{roomId}/messages", new { content = "Quiet update" });
+        message.EnsureSuccessStatusCode();
+        var notifications = await member.Client.GetFromJsonAsync<JsonElement>("/api/notifications");
+
+        Assert.DoesNotContain(notifications.EnumerateArray(), item => item.GetProperty("type").GetString() == "group-message");
+    }
+
     private async Task<(HttpClient Client, int Id)> CreateUser(string name)
     {
         var client = _factory.CreateClient();

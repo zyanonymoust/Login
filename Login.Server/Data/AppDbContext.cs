@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<GroupRoom> GroupRooms { get; set; }
     public DbSet<GroupMember> GroupMembers { get; set; }
     public DbSet<GroupChatMessage> GroupMessages { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -82,6 +83,16 @@ public class AppDbContext : DbContext
             entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.GroupRoomId, x.SentAt }); entity.Property(x => x.Content).HasMaxLength(4000).IsRequired();
             entity.HasOne(x => x.GroupRoom).WithMany(x => x.Messages).HasForeignKey(x => x.GroupRoomId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.Sender).WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.UserId, x.IsRead, x.CreatedAt });
+            entity.Property(x => x.Type).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Title).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.Body).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.TargetKind).HasMaxLength(30).IsRequired();
+            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

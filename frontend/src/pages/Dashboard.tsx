@@ -38,6 +38,7 @@ type Me = {
   status?: string;
 };
 type RecentConversation = { kind: "person" | "group"; id: number; name: string; preview: string; activityAt: string; memberCount: number };
+type AppNotification = { id: number; type: string; title: string; body: string; targetKind: "person" | "group"; targetId: number; isRead: boolean; createdAt: string };
 export type GroupRoom = { id:number; name:string; description:string; isPublic:boolean; status:string; role:string; isMuted:boolean; doNotDisturb:boolean; memberCount:number; invitedBy:string; createdAt:string };
 export default function Dashboard() {
   const fileInput = useRef<HTMLInputElement>(null);
@@ -53,6 +54,7 @@ export default function Dashboard() {
     [uploading, setUploading] = useState(false),
     [groupRooms, setGroupRooms] = useState<GroupRoom[]>([]),
     [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]),
+    [notifications, setNotifications] = useState<AppNotification[]>([]),
     [selectedGroupId, setSelectedGroupId] = useState<number | null>(null),
     [view, setView] = useState<"chat" | "home" | "groups" | "profile" | "settings">(
       "home",
@@ -87,18 +89,21 @@ export default function Dashboard() {
   const refreshRecent = useCallback(async () => {
     try { setRecentConversations(await apiRequest<RecentConversation[]>("/api/messages/recent")); } catch { return; }
   }, []);
+  const refreshNotifications = useCallback(async () => {
+    try { setNotifications(await apiRequest<AppNotification[]>("/api/notifications")); } catch { return; }
+  }, []);
   useEffect(() => {
     apiRequest<Me>("/api/auth/me")
       .then(setMe)
       .catch(() => {});
-    refresh(); refreshGroups(); refreshRecent();
+    refresh(); refreshGroups(); refreshRecent(); refreshNotifications();
     apiRequest("/api/social/heartbeat", { method: "POST" }).catch(() => {});
     const t = setInterval(() => {
       refresh();
       apiRequest("/api/social/heartbeat", { method: "POST" }).catch(() => {});
     }, 15000);
     return () => clearInterval(t);
-  }, [refresh, refreshGroups, refreshRecent]);
+  }, [refresh, refreshGroups, refreshRecent, refreshNotifications]);
   useEffect(() => {
     if (!selected) return;
     let a = true;
@@ -175,20 +180,26 @@ export default function Dashboard() {
     c.on("FriendRequestUpdated", refresh);
     c.on("GroupInviteReceived", refreshGroups);
     c.on("GroupMembershipChanged", () => { refreshGroups(); refreshRecent(); });
+    c.on("NotificationReceived", refreshNotifications);
     c.start().catch(() => {});
     return () => {
       c.stop().catch(() => {});
     };
-  }, [selected, refresh, refreshGroups, refreshRecent]);
+  }, [selected, refresh, refreshGroups, refreshRecent, refreshNotifications]);
   const friends = people.filter((x) => x.friendshipStatus === "accepted"),
     others = people.filter((x) => x.friendshipStatus !== "accepted"),
     incomingRequests = people.filter((x) => x.friendshipStatus === "pending" && x.incoming),
     pendingGroups = groupRooms.filter((x) => x.status === "pending"),
     unread = people.reduce((a, x) => a + x.unread, 0),
-    notificationCount = unread + incomingRequests.length + pendingGroups.length,
+    notificationCount = notifications.filter((item) => !item.isRead).length,
     choose = (p: Person) => {
       setSelected(p);
       setView("chat");
+    },
+    markTargetNotifications = async (targetKind: "person" | "group", targetId: number) => {
+      const matches = notifications.filter((item) => !item.isRead && item.targetKind === targetKind && item.targetId === targetId);
+      await Promise.all(matches.map((item) => apiRequest(`/api/notifications/${item.id}/read`, { method: "POST" })));
+      setNotifications((items) => items.map((item) => item.targetKind === targetKind && item.targetId === targetId ? { ...item, isRead: true } : item));
     },
     add = async (p: Person) => {
       await apiRequest(`/api/social/friends/${p.id}`, { method: "POST" });
@@ -196,14 +207,34 @@ export default function Dashboard() {
     },
     acceptFriend = async (p: Person) => {
       await apiRequest(`/api/social/friends/${p.id}/accept`, { method: "POST" });
+      await markTargetNotifications("person", p.id);
       await refresh();
     },
     declineFriend = async (p: Person) => {
       await apiRequest(`/api/social/friends/${p.id}`, { method: "DELETE" });
+      await markTargetNotifications("person", p.id);
       await refresh();
     },
-    acceptGroup = async (room: GroupRoom) => { await apiRequest(`/api/groups/${room.id}/accept`, { method: "POST" }); await refreshGroups(); },
-    declineGroup = async (room: GroupRoom) => { await apiRequest(`/api/groups/${room.id}/invite`, { method: "DELETE" }); await refreshGroups(); },
+    acceptGroup = async (room: GroupRoom) => { await apiRequest(`/api/groups/${room.id}/accept`, { method: "POST" }); await markTargetNotifications("group", room.id); await refreshGroups(); },
+    declineGroup = async (room: GroupRoom) => { await apiRequest(`/api/groups/${room.id}/invite`, { method: "DELETE" }); await markTargetNotifications("group", room.id); await refreshGroups(); },
+    openNotification = async (item: AppNotification) => {
+      if (!item.isRead) {
+        await apiRequest(`/api/notifications/${item.id}/read`, { method: "POST" });
+        setNotifications((items) => items.map((x) => x.id === item.id ? { ...x, isRead: true } : x));
+      }
+      setNotice(false);
+      if (item.targetKind === "group") {
+        setSelectedGroupId(item.targetId);
+        setView("groups");
+        return;
+      }
+      const person = people.find((x) => x.id === item.targetId);
+      if (person) choose(person);
+    },
+    readAllNotifications = async () => {
+      await apiRequest("/api/notifications/read-all", { method: "POST" });
+      setNotifications((items) => items.map((x) => ({ ...x, isRead: true })));
+    },
     send = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!selected || !draft.trim()) return;
@@ -380,7 +411,7 @@ export default function Dashboard() {
             <Avatar name={me.name} />
             {notice && (
               <div className="notice-pop">
-                <strong>Notifications</strong>
+                <div className="notice-heading"><strong>Notifications</strong>{notificationCount > 0 && <button onClick={readAllNotifications}>Mark all read</button>}</div>
                 {incomingRequests.map((x) => (
                   <div className="friend-notice" key={`friend-${x.id}`}>
                     <Avatar name={x.name} />
@@ -394,13 +425,12 @@ export default function Dashboard() {
                     <div><button onClick={() => acceptGroup(room)}>Accept</button><button className="decline" onClick={() => declineGroup(room)}>Decline</button></div>
                   </div>
                 ))}
-                {people.filter((x) => x.unread).map((x) => (
-                      <button className="message-notice" key={`message-${x.id}`} onClick={() => choose(x)}>
-                        {x.unread} new message{x.unread > 1 ? "s" : ""} from{" "}
-                        {x.name}
-                      </button>
-                    ))}
-                {!notificationCount && (
+                {notifications.filter((item) => item.type === "message" || item.type === "group-message").map((item) => (
+                  <button className={`message-notice notification-item ${item.isRead ? "read" : "unread"}`} key={`notification-${item.id}`} onClick={() => openNotification(item)}>
+                    <strong>{item.title}</strong><span>{item.body}</span><small>{new Date(item.createdAt).toLocaleString()}</small>
+                  </button>
+                ))}
+                {!notifications.length && !incomingRequests.length && !pendingGroups.length && (
                   <p>You're all caught up.</p>
                 )}
               </div>

@@ -37,8 +37,11 @@ public class SocialController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
         if (existing is null)
         {
             db.Friendships.Add(new Friendship { RequesterId = UserId, AddresseeId = otherId });
+            var senderName = await db.Users.Where(x => x.Id == UserId).Select(x => x.Name).SingleAsync();
+            db.Notifications.Add(new Notification { UserId = otherId, Type = "friend-request", Title = senderName, Body = "sent you a friend request", TargetKind = "person", TargetId = UserId });
             await db.SaveChangesAsync();
             await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("FriendRequestReceived", new { fromUserId = UserId });
+            await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "friend-request", targetKind = "person", targetId = UserId });
         }
         else if (existing.AddresseeId == UserId)
         {

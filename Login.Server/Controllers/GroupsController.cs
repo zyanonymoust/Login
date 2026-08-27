@@ -54,8 +54,14 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
         if (!await IsAccepted(roomId, UserId) || userId == UserId) return Forbid();
         if (!await db.Users.AnyAsync(x => x.Id == userId)) return NotFound();
         if (await db.GroupMembers.AnyAsync(x => x.GroupRoomId == roomId && x.UserId == userId)) return Conflict(new { message = "This person is already invited or is a member." });
-        db.GroupMembers.Add(new GroupMember { GroupRoomId = roomId, UserId = userId }); await db.SaveChangesAsync();
-        await hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("GroupInviteReceived", new { roomId }); return Ok();
+        var room = await db.GroupRooms.Where(x => x.Id == roomId).Select(x => new { x.Name }).SingleAsync();
+        var inviter = await db.Users.Where(x => x.Id == UserId).Select(x => x.Name).SingleAsync();
+        db.GroupMembers.Add(new GroupMember { GroupRoomId = roomId, UserId = userId });
+        db.Notifications.Add(new Notification { UserId = userId, Type = "group-invite", Title = room.Name, Body = $"{inviter} invited you to join", TargetKind = "group", TargetId = roomId });
+        await db.SaveChangesAsync();
+        await hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("GroupInviteReceived", new { roomId });
+        await hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("NotificationReceived", new { type = "group-invite", targetKind = "group", targetId = roomId });
+        return Ok();
     }
 
     [HttpPost("{roomId:int}/accept")]
@@ -92,9 +98,17 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     {
         var membership = await db.GroupMembers.AsNoTracking().FirstOrDefaultAsync(x => x.GroupRoomId == roomId && x.UserId == UserId && x.Status == "accepted");
         if (membership is null) return Forbid(); if (membership.IsMuted) return StatusCode(403, new { message = "The room owner has muted you." }); var content = request.Content.Trim(); if (content.Length is < 1 or > 4000) return BadRequest();
-        var row = new GroupChatMessage { GroupRoomId = roomId, SenderId = UserId, Content = content }; db.GroupMessages.Add(row); await db.SaveChangesAsync();
-        var name = await db.Users.Where(x => x.Id == UserId).Select(x => x.Name).SingleAsync(); var payload = new { row.Id, row.GroupRoomId, row.SenderId, senderName = name, row.Content, row.SentAt };
-        await hub.Clients.Group(ChatHub.RoomGroup(roomId)).SendAsync("GroupMessageReceived", payload); return Ok(payload);
+        var row = new GroupChatMessage { GroupRoomId = roomId, SenderId = UserId, Content = content };
+        db.GroupMessages.Add(row);
+        var name = await db.Users.Where(x => x.Id == UserId).Select(x => x.Name).SingleAsync();
+        var roomName = await db.GroupRooms.Where(x => x.Id == roomId).Select(x => x.Name).SingleAsync();
+        var recipients = await db.GroupMembers.Where(x => x.GroupRoomId == roomId && x.UserId != UserId && x.Status == "accepted" && !x.DoNotDisturb).Select(x => x.UserId).ToListAsync();
+        db.Notifications.AddRange(recipients.Select(userId => new Notification { UserId = userId, Type = "group-message", Title = roomName, Body = $"{name}: {content}", TargetKind = "group", TargetId = roomId }));
+        await db.SaveChangesAsync();
+        var payload = new { row.Id, row.GroupRoomId, row.SenderId, senderName = name, row.Content, row.SentAt };
+        await hub.Clients.Group(ChatHub.RoomGroup(roomId)).SendAsync("GroupMessageReceived", payload);
+        await Task.WhenAll(recipients.Select(userId => hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("NotificationReceived", new { type = "group-message", targetKind = "group", targetId = roomId })));
+        return Ok(payload);
     }
 
     [HttpPut("{roomId:int}/details")]
