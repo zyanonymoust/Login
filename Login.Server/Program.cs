@@ -104,7 +104,7 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddCors(options =>
 {
-    var origins = builder.Configuration.GetSection("Frontend:AllowedOrigins").Get<string[]>() ?? ["http://localhost:3002", "http://localhost:5173"];
+    var origins = builder.Configuration.GetSection("Frontend:AllowedOrigins").Get<string[]>() ?? ["http://localhost:3002", "http://127.0.0.1:3002", "http://localhost:5173", "http://127.0.0.1:5173"];
     options.AddPolicy("Frontend", policy =>
     {
         policy

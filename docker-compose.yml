@@ -32,6 +32,7 @@ services:
       Jwt__Key: docker-development-secret-key-at-least-32-characters
       Jwt__ExpirationMinutes: 120
       Frontend__AllowedOrigins__0: "http://localhost:${FRONTEND_HOST_PORT:-3002}"
+      Frontend__AllowedOrigins__1: "http://127.0.0.1:${FRONTEND_HOST_PORT:-3002}"
     ports:
       - "${SERVER_HOST_PORT:-8083}:8080"
     depends_on:
