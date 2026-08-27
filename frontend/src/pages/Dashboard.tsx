@@ -49,6 +49,8 @@ export type GroupRoom = { id:number; name:string; description:string; isPublic:b
 export default function Dashboard() {
   const fileInput = useRef<HTMLInputElement>(null),
     chatHubRef = useRef<HubConnection | null>(null),
+    messageListRef = useRef<HTMLDivElement>(null),
+    pinnedToLatestRef = useRef(true),
     autoAwayRef = useRef(false);
   const nav = useNavigate(),
     [me, setMe] = useState<Me>(() =>
@@ -63,6 +65,8 @@ export default function Dashboard() {
     [conversationMuted, setConversationMuted] = useState(false),
     [chatSearch, setChatSearch] = useState(""),
     [draft, setDraft] = useState(""),
+    [chatError, setChatError] = useState(""),
+    [showLatestButton, setShowLatestButton] = useState(false),
     [uploading, setUploading] = useState(false),
     [groupRooms, setGroupRooms] = useState<GroupRoom[]>([]),
     [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]),
@@ -89,6 +93,7 @@ export default function Dashboard() {
       () => localStorage.getItem("woven-pointer-effect") || "default",
     ),
     [friendshipStreak] = useState(updateActivityStreak);
+  const selectedId = selected?.id;
   const refresh = useCallback(async () => {
     try {
       const d = await apiRequest<Person[]>("/api/social/people");
@@ -120,19 +125,37 @@ export default function Dashboard() {
     return () => clearInterval(t);
   }, [refresh, refreshGroups, refreshRecent, refreshNotifications]);
   useEffect(() => {
-    if (!selected) return;
+    if (!selectedId) return;
     let a = true;
-    apiRequest<Message[]>(`/api/messages/${selected.id}`)
+    apiRequest<Message[]>(`/api/messages/${selectedId}`)
       .then((d) => a && setMessages(d))
       .catch(() => {});
     return () => {
       a = false;
     };
-  }, [selected]);
+  }, [selectedId]);
   useEffect(() => {
-    if (!selected) return;
-    apiRequest<{ muted: boolean }>(`/api/messages/${selected.id}/preference`).then((result) => setConversationMuted(result.muted)).catch(() => setConversationMuted(false));
-  }, [selected]);
+    pinnedToLatestRef.current = true;
+    setShowLatestButton(false);
+    setChatError("");
+  }, [selected?.id]);
+  useEffect(() => {
+    const list = messageListRef.current;
+    if (!list) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (pinnedToLatestRef.current) {
+        list.scrollTo({ top: list.scrollHeight, behavior: "auto" });
+        setShowLatestButton(false);
+      } else {
+        setShowLatestButton(list.scrollHeight - list.scrollTop - list.clientHeight > 24);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages, selectedId]);
+  useEffect(() => {
+    if (!selectedId) return;
+    apiRequest<{ muted: boolean }>(`/api/messages/${selectedId}/preference`).then((result) => setConversationMuted(result.muted)).catch(() => setConversationMuted(false));
+  }, [selectedId]);
   useEffect(() => localStorage.setItem("woven-theme", theme), [theme]);
   useEffect(() => localStorage.setItem("woven-dark", darkMode ? "on" : "off"), [darkMode]);
   useEffect(() => localStorage.setItem("woven-chat-bg", chatBg), [chatBg]);
@@ -197,21 +220,21 @@ export default function Dashboard() {
       refresh();
       refreshRecent();
       if (
-        selected &&
-        (m.senderId === selected.id || m.recipientId === selected.id)
+        selectedId &&
+        (m.senderId === selectedId || m.recipientId === selectedId)
       )
         setMessages((x) => (x.some((y) => y.id === m.id) ? x : [...x, { ...m, isUnread: true }]));
     });
     c.on("MessageSent", (m: Message) => {
       refreshRecent();
       if (
-        selected &&
-        (m.senderId === selected.id || m.recipientId === selected.id)
+        selectedId &&
+        (m.senderId === selectedId || m.recipientId === selectedId)
       )
         setMessages((x) => (x.some((y) => y.id === m.id) ? x : [...x, m]));
     });
     c.on("MessagesRead", (r: { readBy: number; readAt: string }) => {
-      if (selected?.id === r.readBy)
+      if (selectedId === r.readBy)
         setMessages((x) =>
           x.map((m) =>
             m.recipientId === r.readBy ? { ...m, readAt: r.readAt } : m,
@@ -230,7 +253,7 @@ export default function Dashboard() {
       setMessages((messages) => messages.map((message) => message.id === item.id ? { ...message, reactions: item.reactions.map((reaction) => ({ ...reaction, reactedByMe: item.userId === (me.id || me.userId) && reaction.emoji === item.emoji ? item.added : message.reactions?.find((old) => old.emoji === reaction.emoji)?.reactedByMe })) } : message));
     });
     c.on("TypingChanged", (item: { userId: number; isTyping: boolean }) => {
-      if (item.userId === selected?.id) setIsTyping(item.isTyping);
+      if (item.userId === selectedId) setIsTyping(item.isTyping);
     });
     c.on("PresenceChanged", refresh);
     c.on("FriendRequestReceived", refresh);
@@ -246,7 +269,7 @@ export default function Dashboard() {
       if (chatHubRef.current === c) chatHubRef.current = null;
       c.stop().catch(() => {});
     };
-  }, [selected, refresh, refreshGroups, refreshRecent, refreshNotifications, me.id, me.userId, desktopNotifications]);
+  }, [selectedId, refresh, refreshGroups, refreshRecent, refreshNotifications, me.id, me.userId, desktopNotifications]);
   useEffect(() => {
     if (!selected || !chatHubRef.current) return;
     chatHubRef.current.invoke("SendTyping", selected.id, draft.trim().length > 0).catch(() => {});
@@ -368,15 +391,23 @@ export default function Dashboard() {
     send = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!selected || !draft.trim()) return;
+      pinnedToLatestRef.current = true;
+      setShowLatestButton(false);
       const content = draft;
       setDraft("");
-      await apiRequest(`/api/messages/${selected.id}`, {
-        method: "POST",
-        body: JSON.stringify({ content, replyToId: replyingTo?.id }),
-      });
-      setReplyingTo(null);
-      setMessages(await apiRequest<Message[]>(`/api/messages/${selected.id}`));
-      refreshRecent();
+      setChatError("");
+      try {
+        await apiRequest(`/api/messages/${selected.id}`, {
+          method: "POST",
+          body: JSON.stringify({ content, replyToId: replyingTo?.id }),
+        });
+        setReplyingTo(null);
+        setMessages(await apiRequest<Message[]>(`/api/messages/${selected.id}`));
+        refreshRecent();
+      } catch (error) {
+        setDraft(content);
+        setChatError(error instanceof Error ? error.message : "The message could not be sent.");
+      }
     },
     save = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -413,6 +444,8 @@ export default function Dashboard() {
         return;
       }
       setUploading(true);
+      pinnedToLatestRef.current = true;
+      setShowLatestButton(false);
       try {
         const body = new FormData();
         body.append("file", file);
@@ -433,7 +466,21 @@ export default function Dashboard() {
         e.target.value = "";
       }
     };
-  const firstUnreadId = messages.find((message) => message.isUnread)?.id;
+  const firstUnreadId = messages.find((message) => message.isUnread)?.id,
+    trackMessageScroll = () => {
+      const list = messageListRef.current;
+      if (!list) return;
+      const atLatest = list.scrollHeight - list.scrollTop - list.clientHeight <= 24;
+      pinnedToLatestRef.current = atLatest;
+      setShowLatestButton(!atLatest);
+    },
+    scrollToLatest = () => {
+      const list = messageListRef.current;
+      if (!list) return;
+      pinnedToLatestRef.current = true;
+      setShowLatestButton(false);
+      list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+    };
   return (
     <div className={`woven-app theme-${theme} ${darkMode ? "dark" : ""}`}>
       <aside className="app-sidebar">
@@ -494,23 +541,25 @@ export default function Dashboard() {
             placeholder="Search people"
           />
         </label>
-        <Group
-          title="Friends"
-          people={friends.filter((x) =>
-            x.name.toLowerCase().includes(query.toLowerCase()),
-          )}
-          selected={selected}
-          choose={choose}
-        />
-        <Group
-          title="Public"
-          people={others.filter((x) =>
-            x.name.toLowerCase().includes(query.toLowerCase()),
-          )}
-          selected={selected}
-          choose={choose}
-          add={add}
-        />
+        <div className="people-scroll">
+          <Group
+            title="Friends"
+            people={friends.filter((x) =>
+              x.name.toLowerCase().includes(query.toLowerCase()),
+            )}
+            selected={selected}
+            choose={choose}
+          />
+          <Group
+            title="Public"
+            people={others.filter((x) =>
+              x.name.toLowerCase().includes(query.toLowerCase()),
+            )}
+            selected={selected}
+            choose={choose}
+            add={add}
+          />
+        </div>
         <div className="my-card">
           <Avatar name={me.name} avatarUrl={me.avatarUrl} />
           <span>
@@ -660,7 +709,7 @@ export default function Dashboard() {
                 {selected.friendshipStatus === "pending" && !selected.incoming ? <button disabled>Request sent</button> : selected.incoming ? <div><button onClick={() => acceptFriend(selected)}>Accept</button><button className="decline" onClick={() => declineFriend(selected)}>Decline</button></div> : <button onClick={() => add(selected)}>Add friend</button>}
               </div>
             )}
-            <div className="message-list">
+            <div className="message-list" ref={messageListRef} onScroll={trackMessageScroll}>
               {!messages.length && (
                 <div className="start-chat">
                   <Avatar name={selected.name} avatarUrl={selected.avatarUrl} />
@@ -701,7 +750,9 @@ export default function Dashboard() {
                 );
               })}
             </div>
+            {showLatestButton && <button className="latest-message-button" type="button" onClick={scrollToLatest} aria-label="Show newest message" title="Show newest message">↓</button>}
             {isTyping && <div className="typing-indicator"><i /><i /><i /><span>{selected.name} is typing</span></div>}
+            {chatError && <div className="chat-send-error" role="alert"><span>!</span>{chatError}<button type="button" onClick={() => setChatError("")} aria-label="Dismiss message error">×</button></div>}
             <form className="composer" onSubmit={send}>
               {replyingTo && <div className="replying-preview"><span><strong>Replying to {replyingTo.senderId === (me.id || me.userId) ? "yourself" : selected.name}</strong><small>{replyingTo.content || replyingTo.attachmentName || "Attachment"}</small></span><button type="button" onClick={() => setReplyingTo(null)} aria-label="Cancel reply">×</button></div>}
               <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading} title="Add image or file">{uploading ? "…" : "＋"}</button>
