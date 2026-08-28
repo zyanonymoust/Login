@@ -1175,13 +1175,14 @@ function Group({
   choose: (p: Person) => void;
   add?: (p: Person) => void;
 }) {
+  const sortedPeople = [...people].sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
   return (
     <div className="people-group">
       <h4>
         {title}
         <span>{people.length}</span>
       </h4>
-      {people.map((p) => (
+      {sortedPeople.map((p) => (
         <div
           className={`person-row ${selected?.id === p.id ? "active" : ""}`}
           key={p.id}
