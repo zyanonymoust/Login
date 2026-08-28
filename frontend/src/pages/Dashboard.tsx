@@ -270,9 +270,9 @@ export default function Dashboard() {
     c.on("FriendRequestUpdated", refresh);
     c.on("GroupInviteReceived", refreshGroups);
     c.on("GroupMembershipChanged", () => { refreshGroups(); refreshRecent(); });
-    c.on("NotificationReceived", () => {
+    c.on("NotificationReceived", (item: { title?: string; body?: string }) => {
       refreshNotifications();
-      if (desktopNotifications && "Notification" in window && window.Notification.permission === "granted" && document.hidden) new window.Notification("Woven", { body: "You have a new notification." });
+      if (desktopNotifications && "Notification" in window && window.Notification.permission === "granted" && document.hidden) new window.Notification(item.title || "Woven", { body: item.body || "You have a new notification." });
     });
     c.start().then(() => { chatHubRef.current = c; }).catch(() => {});
     return () => {
@@ -647,13 +647,18 @@ export default function Dashboard() {
                     <div><button onClick={() => acceptGroup(room)}>Accept</button><button className="decline" onClick={() => declineGroup(room)}>Decline</button></div>
                   </div>
                 ))}
-                {notifications.filter((item) => item.type === "message" || item.type === "group-message").map((item) => (
+                {notifications.filter((item) => item.type !== "friend-request" && item.type !== "group-invite").map((item) => (
                   <button className={`message-notice notification-item ${item.isRead ? "read" : "unread"}`} key={`notification-${item.id}`} onClick={() => openNotification(item)}>
+                    <span className="notification-kind">{item.type === "message" ? "Message" : item.type === "group-message" ? "Group message" : item.type === "friend-accepted" ? "Friend update" : item.type === "group-accepted" ? "Group update" : "Activity"}</span>
                     <strong>{item.title}</strong><span>{item.body}</span><small>{new Date(item.createdAt).toLocaleString()}</small>
                   </button>
                 ))}
                 {!notifications.length && !incomingRequests.length && !pendingGroups.length && (
-                  <p>You're all caught up.</p>
+                  <div className="notification-empty">
+                    <strong>No notifications yet</strong>
+                    <span>New messages, friend requests and group activity will appear here.</span>
+                    <small>🔔 Messages</small><small>👤 Friend requests</small><small>👥 Group activity</small>
+                  </div>
                 )}
               </div>
             )}

@@ -68,8 +68,17 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     public async Task<IActionResult> Accept(int roomId)
     {
         var member = await db.GroupMembers.FirstOrDefaultAsync(x => x.GroupRoomId == roomId && x.UserId == UserId && x.Status == "pending");
-        if (member is null) return NotFound(); member.Status = "accepted"; await db.SaveChangesAsync();
-        await hub.Clients.Group(ChatHub.RoomGroup(roomId)).SendAsync("GroupMembershipChanged", new { roomId, userId = UserId, status = "accepted" }); return Ok();
+        if (member is null) return NotFound();
+        member.Status = "accepted";
+        var details = await db.GroupRooms.Where(x => x.Id == roomId).Select(x => new { x.Name, x.CreatedById }).SingleAsync();
+        var memberName = await db.Users.Where(x => x.Id == UserId).Select(x => x.Name).SingleAsync();
+        if (details.CreatedById != UserId)
+            db.Notifications.Add(new Notification { UserId = details.CreatedById, Type = "group-accepted", Title = details.Name, Body = $"{memberName} joined your group", TargetKind = "group", TargetId = roomId });
+        await db.SaveChangesAsync();
+        await hub.Clients.Group(ChatHub.RoomGroup(roomId)).SendAsync("GroupMembershipChanged", new { roomId, userId = UserId, status = "accepted" });
+        if (details.CreatedById != UserId)
+            await hub.Clients.Group(ChatHub.UserGroup(details.CreatedById)).SendAsync("NotificationReceived", new { type = "group-accepted", title = details.Name, body = $"{memberName} joined your group", targetKind = "group", targetId = roomId });
+        return Ok();
     }
 
     [HttpDelete("{roomId:int}/invite")]

@@ -58,8 +58,12 @@ public class SocialController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     {
         var request = await db.Friendships.FirstOrDefaultAsync(x => x.RequesterId == otherId && x.AddresseeId == UserId && x.Status == "pending");
         if (request is null) return NotFound(new { message = "Friend request not found." });
-        request.Status = "accepted"; await db.SaveChangesAsync();
+        request.Status = "accepted";
+        var accepterName = await db.Users.Where(x => x.Id == UserId).Select(x => x.Name).SingleAsync();
+        db.Notifications.Add(new Notification { UserId = otherId, Type = "friend-accepted", Title = accepterName, Body = "accepted your friend request", TargetKind = "person", TargetId = UserId });
+        await db.SaveChangesAsync();
         await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("FriendRequestUpdated", new { userId = UserId, status = "accepted" });
+        await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "friend-accepted", title = accepterName, body = "accepted your friend request", targetKind = "person", targetId = UserId });
         return Ok();
     }
 

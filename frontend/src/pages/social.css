@@ -563,8 +563,13 @@
 .notice-heading > button { width: auto; margin: 0; padding: 5px 7px; color: var(--accent); background: transparent; font-size: 10px; }
 .notification-item { display: flex; flex-direction: column; gap: 3px; }
 .notification-item span, .notification-item small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.notification-item .notification-kind { color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .notification-item.unread { border-left: 3px solid var(--accent); }
 .notification-item.read { opacity: .7; }
+.notification-empty { display: flex; flex-direction: column; gap: 7px; padding: 14px 4px 3px; color: var(--muted); }
+.notification-empty strong { color: var(--ink); }
+.notification-empty > span { margin-bottom: 5px; font-size: 11px; line-height: 1.45; }
+.notification-empty small { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
 .friend-notice { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; margin-top: 10px; padding: 10px; border-radius: 11px; background: var(--soft); }
 .friend-notice > span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .friend-notice small { color: var(--muted); }
