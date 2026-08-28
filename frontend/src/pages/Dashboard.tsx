@@ -662,19 +662,23 @@ export default function Dashboard() {
             {notice && (
               <div className="notice-pop">
                 <div className="notice-heading"><strong>Notifications</strong><div>{notificationCount > 0 && <button onClick={readAllNotifications}>Mark all read</button>}{notifications.some((item) => item.isRead) && <button onClick={deleteReadNotifications}>Delete read</button>}</div></div>
-                {incomingRequests.map((x) => (
-                  <div className="friend-notice" key={`friend-${x.id}`}>
+                {incomingRequests.map((x) => {
+                  const isUnread = notifications.some((item) => item.type === "friend-request" && item.targetKind === "person" && item.targetId === x.id && !item.isRead);
+                  return <div className={`friend-notice request-notice ${isUnread ? "unread" : "read"}`} key={`friend-${x.id}`} onClick={() => isUnread && markTargetNotifications("person", x.id)}>
                     <Avatar name={x.name} avatarUrl={x.avatarUrl} />
                     <span><small>Friend request</small><strong>{x.name} sent you a friend request</strong></span>
+                    {isUnread && <i className="request-unread-dot" aria-label="Unread" />}
                     <div><button onClick={() => acceptFriend(x)}>Accept</button><button className="decline" onClick={() => declineFriend(x)}>Decline</button></div>
-                  </div>
-                ))}
-                {pendingGroups.map((room) => (
-                  <div className="friend-notice group-invite-notice" key={`group-${room.id}`}>
+                  </div>;
+                })}
+                {pendingGroups.map((room) => {
+                  const isUnread = notifications.some((item) => item.type === "group-invite" && item.targetKind === "group" && item.targetId === room.id && !item.isRead);
+                  return <div className={`friend-notice group-invite-notice request-notice ${isUnread ? "unread" : "read"}`} key={`group-${room.id}`} onClick={() => isUnread && markTargetNotifications("group", room.id)}>
                     <div className="avatar">👥</div><span><small>Group invitation</small><strong>{room.invitedBy} invited you to join {room.name}</strong></span>
+                    {isUnread && <i className="request-unread-dot" aria-label="Unread" />}
                     <div><button onClick={() => acceptGroup(room)}>Accept</button><button className="decline" onClick={() => declineGroup(room)}>Decline</button></div>
-                  </div>
-                ))}
+                  </div>;
+                })}
                 {!incomingRequests.length && !pendingGroups.length && (
                   <div className="notification-empty">
                     <i>✓</i>

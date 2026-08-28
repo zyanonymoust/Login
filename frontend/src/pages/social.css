@@ -182,6 +182,7 @@
   flex: none;
 }
 .avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.woven-app .avatar { display: flex !important; align-items: center !important; justify-content: center !important; padding: 0 !important; text-align: center !important; line-height: 1 !important; }
 .profile-page { height: calc(100vh - 86px); overflow: auto; }
 .profile-page .settings-view { min-height: auto; }
 .password-settings { margin-top: 18px; }
@@ -584,6 +585,10 @@
 .notification-empty strong { color: var(--ink); font-size: 16px; }
 .notification-empty > span { max-width: 270px; font-size: 11px; line-height: 1.55; }
 .friend-notice { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; margin-top: 10px; padding: 10px; border-radius: 11px; background: var(--soft); }
+.request-notice { position: relative; border: 1px solid transparent; cursor: pointer; transition: border-color .18s ease, opacity .18s ease; }
+.request-notice.unread { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.request-notice.read { opacity: .82; }
+.request-unread-dot { position: absolute; top: 10px; right: 10px; width: 9px; height: 9px; border-radius: 50%; background: #ef5261; box-shadow: 0 0 0 3px color-mix(in srgb, #ef5261 18%, transparent); }
 .friend-notice > span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .friend-notice small { color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .friend-notice strong { font-size: 12px; line-height: 1.4; }
