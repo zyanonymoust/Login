@@ -617,12 +617,13 @@ export default function Dashboard() {
           <Group
             title="Public"
             totalCount={others.length}
-            people={query.trim() ? others.filter((x) =>
+            people={others.filter((x) =>
               x.name.toLowerCase().includes(query.toLowerCase()),
-            ) : []}
+            )}
             selected={selected}
             choose={choose}
             add={add}
+            collapsible
           />
         </div>
         <div className="my-card">
@@ -1150,6 +1151,7 @@ function Group({
   choose,
   add,
   totalCount,
+  collapsible = false,
 }: {
   title: string;
   people: Person[];
@@ -1157,15 +1159,20 @@ function Group({
   choose: (p: Person) => void;
   add?: (p: Person) => void;
   totalCount?: number;
+  collapsible?: boolean;
 }) {
+  const [open, setOpen] = useState(true);
   const sortedPeople = [...people].sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
   return (
     <div className="people-group">
-      <h4>
-        {title}
-        <span>{totalCount ?? people.length}</span>
+      <h4 className={collapsible ? "collapsible" : ""}>
+        <button type="button" onClick={() => collapsible && setOpen((value) => !value)} aria-expanded={!collapsible || open}>
+          {title}
+          <span>{totalCount ?? people.length}</span>
+          {collapsible && <i>{open ? "⌃" : "⌄"}</i>}
+        </button>
       </h4>
-      {sortedPeople.map((p) => (
+      {(!collapsible || open) && sortedPeople.map((p) => (
         <div
           className={`person-row ${selected?.id === p.id ? "active" : ""}`}
           key={p.id}

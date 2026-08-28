@@ -397,14 +397,29 @@
   padding: 0 4px 10px 0;
 }
 .people-group h4 {
-  display: flex;
-  gap: 8px;
   margin: 26px 8px 9px;
   color: var(--muted);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.7px;
 }
+.people-group h4 button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+}
+.people-group h4:not(.collapsible) button { cursor: default; }
+.people-group h4.collapsible button { cursor: pointer; }
+.people-group h4 button i { margin-left: auto; font-style: normal; font-size: 15px; }
 .people-group h4 span {
   background: #eeeaf7;
   padding: 1px 6px;
