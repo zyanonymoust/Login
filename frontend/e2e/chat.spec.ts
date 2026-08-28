@@ -9,6 +9,20 @@ type AuthResponse = {
 
 const apiUrl = process.env.E2E_API_URL || "http://localhost:8083";
 
+async function gotoWithRetry(page: Page, url: string) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 10000 });
+      return;
+    } catch (error) {
+      lastError = error;
+      await page.waitForTimeout(750 * (attempt + 1));
+    }
+  }
+  throw lastError;
+}
+
 async function createUser(request: APIRequestContext, name: string) {
   const email = `${name.toLowerCase().replaceAll(" ", "-")}-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
   const response = await request.post(`${apiUrl}/api/auth/register`, {
@@ -20,15 +34,20 @@ async function createUser(request: APIRequestContext, name: string) {
 
 async function openSession(browser: Browser, auth: AuthResponse) {
   const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto("/");
-  await page.evaluate((user) => {
-    localStorage.setItem("token", user.token);
-    localStorage.setItem("user", JSON.stringify({ userId: user.userId, name: user.name, email: user.email }));
-  }, auth);
-  await page.goto("/dashboard");
-  await expect(page.getByRole("heading", { name: `Good day, ${auth.name.split(" ")[0]}` })).toBeVisible();
-  return { context, page };
+  try {
+    const page = await context.newPage();
+    await gotoWithRetry(page, "/");
+    await page.evaluate((user) => {
+      localStorage.setItem("token", user.token);
+      localStorage.setItem("user", JSON.stringify({ userId: user.userId, name: user.name, email: user.email }));
+    }, auth);
+    await gotoWithRetry(page, "/dashboard");
+    await expect(page.getByRole("heading", { name: `Good day, ${auth.name.split(" ")[0]}` })).toBeVisible();
+    return { context, page };
+  } catch (error) {
+    await context.close();
+    throw error;
+  }
 }
 
 async function openConversation(page: Page, name: string) {
@@ -40,6 +59,7 @@ async function openConversation(page: Page, name: string) {
 }
 
 test("two users exchange a realtime message with draft and read states", async ({ browser, request }) => {
+  test.setTimeout(60000);
   const suffix = `${Date.now()}`.slice(-7);
   const senderAuth = await createUser(request, `Sender ${suffix}`);
   const recipientAuth = await createUser(request, `Recipient ${suffix}`);

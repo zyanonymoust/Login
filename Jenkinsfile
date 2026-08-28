@@ -46,7 +46,7 @@ pipeline {
 
         stage('Wait For Frontend') {
             steps {
-                bat 'powershell.exe -NoProfile -Command "for ($i = 0; $i -lt 30; $i++) { try { Invoke-WebRequest -UseBasicParsing %E2E_BASE_URL% | Out-Null; exit 0 } catch { Start-Sleep -Seconds 2 } }; exit 1"'
+                bat 'powershell.exe -NoProfile -Command "$ready = 0; for ($i = 0; $i -lt 45; $i++) { try { Invoke-WebRequest -UseBasicParsing %E2E_BASE_URL% | Out-Null; $ready++; if ($ready -ge 3) { exit 0 } } catch { $ready = 0 }; Start-Sleep -Seconds 2 }; exit 1"'
             }
         }
 
