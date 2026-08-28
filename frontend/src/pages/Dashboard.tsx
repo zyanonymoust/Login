@@ -1109,17 +1109,17 @@ function BoredomBreak() {
           <article className="guess-card classic-guess-card">
             <div className="game-heading"><div className="game-icon">🔢</div><div><h3>Guess the Number</h3><p>Find the hidden number from 1 to 100.</p></div></div>
             <div className="guess-range"><span>1</span><div className="range-line"/><span>100</span></div>
-            <div className="game-input-row"><input type="number" min="1" max="100" value={guess} disabled={guessCompleted} placeholder="Your guess" onChange={(event) => setGuess(event.target.value)} onKeyDown={(event) => event.key === "Enter" && !guessCompleted && checkGuess()} /><button onClick={guessCompleted ? resetGuess : checkGuess}>{guessCompleted ? "New Game" : "Guess"}</button></div>
+            <div className="game-input-row"><input type="number" min="1" max="100" value={guess} disabled={guessCompleted} placeholder="Your guess" onChange={(event) => setGuess(event.target.value)} onKeyDown={(event) => event.key === "Enter" && !guessCompleted && checkGuess()} /><button onMouseDown={(event) => event.preventDefault()} onClick={guessCompleted ? resetGuess : checkGuess}>{guessCompleted ? "New Game" : "Guess"}</button></div>
             <div className={guessCompleted ? "game-message success" : "game-message"}><p>{guessHint}</p><span>Attempts: {attempts}</span></div>
           </article>
           <article className="reaction-card classic-reaction-card">
           <div className="game-heading"><div className="game-icon">⚡</div><div><h3>Reaction Speed</h3><p>Click when the colour changes.</p></div></div>
           <div className="reaction-score"><div><span>Latest</span><strong>{reactionTime === null ? "—" : `${reactionTime} ms`}</strong></div><div><span>Best</span><strong>{bestReaction === null ? "—" : `${bestReaction} ms`}</strong></div></div>
-          {reaction === "idle" && <button className="reaction-start" onClick={startReaction}>Start Reaction Test</button>}
-          {reaction === "waiting" && <button className="reaction-zone waiting" onClick={hitReaction}>Wait for green...</button>}
-          {reaction === "ready" && <button className="reaction-zone ready" onClick={hitReaction}>CLICK NOW!</button>}
-          {reaction === "early" && <div className="reaction-result early"><strong>Too early!</strong><span>Wait until the area turns green.</span><button onClick={startReaction}>Try Again</button></div>}
-          {reaction === "finished" && <div className="reaction-result finished"><strong>{reactionTime} ms</strong><span>{reactionRating}</span><button onClick={startReaction}>Play Again</button></div>}
+          {reaction === "idle" && <button className="reaction-start" onMouseDown={(event) => event.preventDefault()} onClick={startReaction}>Start Reaction Test</button>}
+          {reaction === "waiting" && <button className="reaction-zone waiting" onMouseDown={(event) => event.preventDefault()} onClick={hitReaction}>Wait for green...</button>}
+          {reaction === "ready" && <button className="reaction-zone ready" onMouseDown={(event) => event.preventDefault()} onClick={hitReaction}>CLICK NOW!</button>}
+          {reaction === "early" && <div className="reaction-result early"><strong>Too early!</strong><span>Wait until the area turns green.</span><button onMouseDown={(event) => event.preventDefault()} onClick={startReaction}>Try Again</button></div>}
+          {reaction === "finished" && <div className="reaction-result finished"><strong>{reactionTime} ms</strong><span>{reactionRating}</span><button onMouseDown={(event) => event.preventDefault()} onClick={startReaction}>Play Again</button></div>}
         </article>
           <JumpGame />
         </div>

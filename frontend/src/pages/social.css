@@ -1038,6 +1038,8 @@
 .guess-controls .guess-reset { padding: 0 12px; color: var(--accent); }
 .classic-guess-card { min-height: 310px !important; padding: 22px !important; }
 .classic-reaction-card { min-height: 310px !important; padding: 22px !important; }
+.classic-guess-card, .classic-reaction-card { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.classic-guess-card ::selection, .classic-reaction-card ::selection { color: inherit; background: transparent; }
 .game-heading { display: flex; align-items: center; gap: 14px; }
 .game-icon { width: 52px; height: 52px; display: grid; flex: none; place-items: center; border-radius: 17px; background: var(--soft); font-size: 25px; }
 .game-heading h3 { margin: 0 0 5px; font: 700 20px Manrope; }
@@ -1310,8 +1312,8 @@
   .boredom-break { margin-top: 25px; }
   .break-heading p { display: none; }
   .break-grid { grid-template-columns: 1fr; }
-  .break-grid article { width: 100%; max-width: 430px; box-sizing: border-box; justify-self: center; padding: 16px; }
-  .classic-guess-card, .classic-reaction-card { min-height: 280px !important; padding: 18px !important; }
+  .break-grid article { width: 100%; max-width: 380px; box-sizing: border-box; justify-self: center; padding: 14px; }
+  .classic-guess-card, .classic-reaction-card { min-height: 245px !important; padding: 15px !important; }
   .game-input-row { gap: 7px; }
   .game-input-row input { height: 42px; padding: 0 12px; border-radius: 10px; }
   .game-input-row button { min-height: 40px; padding: 0 11px; border-radius: 10px; font-size: 11px; }
@@ -1319,6 +1321,12 @@
   .reaction-result button { min-height: 36px; padding: 0 14px; font-size: 11px; }
   .game-heading h3 { font-size: 17px; }
   .game-heading p { font-size: 12px; }
+  .game-icon { width: 43px; height: 43px; border-radius: 13px; font-size: 20px; }
+  .guess-range { margin: 16px 0 13px; }
+  .game-message { min-height: 58px; margin-top: 12px; padding: 11px; font-size: 12px; }
+  .game-message p { margin-bottom: 6px; }
+  .reaction-score { margin: 14px 0 12px; }
+  .reaction-score div { padding: 11px; }
   .jump-game-card { margin-inline: auto !important; padding: 12px !important; }
   .jump-game-header { gap: 10px; }
   .jump-game-instructions { margin-top: 10px; }
