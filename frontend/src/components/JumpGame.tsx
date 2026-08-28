@@ -1353,30 +1353,21 @@ function JumpGame() {
                                 Hold mouse or Space
                             </div>
 
-                            <div className="charge-container">
-                                <div className="charge-label">
-                                    <span>
-                                        Jump power
-                                    </span>
-
-                                    <strong>
-                                        {chargePercent}%
-                                    </strong>
-                                </div>
-
-                                <div className="charge-track">
-                                    <div
-                                        className="charge-fill"
-                                        style={{
-                                            width:
-                                                `${chargeBarPercent}%`
-                                        }}
-                                    />
-                                </div>
-                            </div>
                         </>
                     )}
             </div>
+
+            {gameState === "playing" && (
+                <div className="charge-container">
+                    <div className="charge-label">
+                        <span>Jump power</span>
+                        <strong>{chargePercent}%</strong>
+                    </div>
+                    <div className="charge-track">
+                        <div className="charge-fill" style={{ width: `${chargeBarPercent}%` }} />
+                    </div>
+                </div>
+            )}
 
             <div className="jump-game-instructions">
                 <span>

@@ -1,9 +1,10 @@
 .jump-game-card {
     grid-column: 1 / -1;
-    padding: 24px;
+    box-sizing: border-box;
+    padding: 18px;
     overflow: hidden;
     border: 1px solid rgba(111, 91, 211, 0.16);
-    border-radius: 24px;
+    border-radius: 19px;
     background: linear-gradient( 145deg, rgba(255, 255, 255, 0.96), rgba(247, 245, 255, 0.92) );
     box-shadow: 0 20px 45px rgba(55, 38, 120, 0.12);
     transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
@@ -14,7 +15,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 24px;
-    margin-bottom: 20px;
+    margin-bottom: 14px;
 }
 
 .jump-game-title {
@@ -56,9 +57,11 @@
     display: flex;
     flex-shrink: 0;
     gap: 10px;
+    min-width: 0;
 }
 
     .jump-game-scores > div {
+        box-sizing: border-box;
         display: flex;
         min-width: 82px;
         padding: 10px 14px;
@@ -102,7 +105,7 @@
     display: block;
     width: 100%;
     height: auto;
-    aspect-ratio: 15 / 7;
+    aspect-ratio: 18 / 7;
 }
 
 .jump-game-overlay {
@@ -222,14 +225,14 @@
 }
 
 .charge-container {
-    position: absolute;
-    right: 18px;
-    bottom: 17px;
-    width: min(235px, 32%);
+    position: relative;
+    width: min(340px, 72%);
+    box-sizing: border-box;
+    margin: 12px auto 0;
     padding: 10px 12px;
     border: 1px solid rgba(255, 255, 255, 0.17);
     border-radius: 13px;
-    background: rgba(11, 16, 52, 0.58);
+    background: rgba(27, 31, 70, 0.92);
     box-shadow: 0 10px 25px rgba(8, 11, 41, 0.25);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -363,8 +366,10 @@
         width: 100%;
     }
 
-        .jump-game-scores > div {
-            width: 50%;
+    .jump-game-scores > div {
+            width: auto;
+            min-width: 0;
+            flex: 1;
         }
 
     .jump-game-stage {
@@ -379,9 +384,8 @@
     }
 
     .charge-container {
-        right: 9px;
-        bottom: 9px;
-        width: 38%;
+        width: min(310px, 86%);
+        margin-top: 10px;
         padding: 7px 8px;
     }
 

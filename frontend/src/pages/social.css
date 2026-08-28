@@ -1015,10 +1015,10 @@
 .break-heading span { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 1.3px; }
 .break-heading h3 { margin: 6px 0 0; font: 700 22px Manrope; }
 .break-heading p { margin: 0; color: var(--muted); font-size: 13px; }
-.game-shelf { width: 100%; padding: 3px 3px 15px; }
+.game-shelf { width: 100%; box-sizing: border-box; padding: 3px 3px 15px; }
 .break-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; width: 100%; }
 .break-grid article { min-height: 210px; padding: 23px; border: 1px solid var(--line); border-radius: 18px; background: white; box-shadow: 0 10px 30px #211d310b; }
-.break-grid > .jump-game-card { width: 100%; min-width: 0; margin: 0; }
+.break-grid > .jump-game-card { width: min(820px, 100%); min-width: 0; margin: 0 auto; justify-self: center; }
 .prompt-card { background-image: radial-gradient(circle at 95% 5%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 38%) !important; }
 .reaction-card { background-image: radial-gradient(circle at 95% 5%, #ffd78c55, transparent 38%) !important; }
 .activity-icon { width: 38px; height: 38px; display: grid; place-items: center; margin-bottom: 20px; border-radius: 11px; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, white); font-size: 18px; }
@@ -1033,27 +1033,27 @@
 .guess-controls { display: flex; gap: 7px; }
 .guess-controls input { min-width: 0; width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; outline: none; }
 .guess-controls .guess-reset { padding: 0 12px; color: var(--accent); }
-.classic-guess-card { min-height: 390px !important; padding: 28px !important; }
-.classic-reaction-card { min-height: 390px !important; padding: 28px !important; }
+.classic-guess-card { min-height: 310px !important; padding: 22px !important; }
+.classic-reaction-card { min-height: 310px !important; padding: 22px !important; }
 .game-heading { display: flex; align-items: center; gap: 14px; }
 .game-icon { width: 52px; height: 52px; display: grid; flex: none; place-items: center; border-radius: 17px; background: var(--soft); font-size: 25px; }
 .game-heading h3 { margin: 0 0 5px; font: 700 20px Manrope; }
 .game-heading p { margin: 0; color: var(--muted); font-size: 14px; }
-.guess-range { display: flex; align-items: center; gap: 11px; margin: 38px 0 25px; color: var(--muted); font-weight: 700; }
+.guess-range { display: flex; align-items: center; gap: 11px; margin: 24px 0 18px; color: var(--muted); font-weight: 700; }
 .range-line { flex: 1; height: 7px; border-radius: 10px; background: linear-gradient(90deg, #7b68ee, #49b7ff, #53d69d); }
 .game-input-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
 .game-input-row input { width: 100%; height: 50px; padding: 0 16px; border: 1px solid var(--line); border-radius: 13px; color: var(--ink); background: var(--soft); outline: none; }
 .game-input-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 13%, transparent); }
 .game-input-row button { min-height: 50px; padding: 0 22px; border: 0; border-radius: 13px; color: white; background: var(--accent); font-weight: 800; }
-.game-message { min-height: 92px; margin-top: 22px; padding: 17px; border-radius: 15px; background: var(--soft); }
+.game-message { min-height: 70px; margin-top: 16px; padding: 13px; border-radius: 15px; background: var(--soft); }
 .game-message.success { background: #34c77a21; }
 .game-message p { margin: 0 0 10px; font-weight: 700; }
 .game-message span { color: var(--muted); font-size: 13px; }
-.reaction-score { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 30px 0 20px; }
+.reaction-score { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 20px 0 16px; }
 .reaction-score div { display: flex; flex-direction: column; gap: 7px; padding: 16px; border-radius: 15px; background: var(--soft); }
 .reaction-score span { color: var(--muted); font-size: 12px; text-transform: uppercase; }
 .reaction-score strong { font-size: 20px; }
-.reaction-start, .reaction-zone { width: 100%; height: 118px; border: 0; border-radius: 18px; color: white; font-weight: 800; cursor: pointer; }
+.reaction-start, .reaction-zone { width: 100%; height: 88px; border: 0; border-radius: 16px; color: white; font-weight: 800; cursor: pointer; }
 .reaction-start { background: var(--accent); }
 .reaction-zone.waiting { background: linear-gradient(135deg, #ef5365, #d9364c); }
 .reaction-zone.ready { background: linear-gradient(135deg, #39d98a, #14a762); animation: reaction-ready .65s infinite alternate; }
@@ -1064,7 +1064,7 @@
 .reaction-result span { color: var(--muted); }
 .reaction-result button { min-height: 40px; margin-top: 5px; padding: 0 20px; border: 0; border-radius: 10px; color: white; background: var(--accent); font-weight: 800; }
 .jump-game-wrap { width: 100%; min-width: 0; margin-top: 24px; }
-.jump-game-wrap .jump-game-card { width: 100%; min-width: 0; }
+.jump-game-wrap .jump-game-card { width: min(820px, 100%); min-width: 0; margin-inline: auto; }
 .dark-mode-setting { width: 100%; display: flex; align-items: center; gap: 13px; margin-top: 26px; padding: 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--soft); color: var(--ink); text-align: left; }
 .dark-mode-setting > span { width: 37px; height: 37px; display: grid; place-items: center; border-radius: 10px; background: var(--accent); color: white; font-size: 18px; }
 .dark-mode-setting > div { display: flex; flex: 1; flex-direction: column; gap: 4px; }
@@ -1169,7 +1169,7 @@
     grid-template-columns: 1fr;
   }
   .quick-section { grid-template-columns: 1fr; }
-  .break-grid { grid-template-columns: 1fr; }
+  .break-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .product-preview {
     grid-template-columns: 65px 240px 1fr;
   }
@@ -1177,7 +1177,7 @@
     padding: 35px 25px;
   }
 }
-@media (max-width: 650px) {
+@media (max-width: 900px) {
   .landing-nav {
     padding: 0 18px;
   }
@@ -1222,6 +1222,7 @@
     flex-direction: row;
     padding: 8px 12px;
   }
+  .woven-app.dark > .app-sidebar { position: fixed; }
   .app-sidebar .app-logo {
     display: none;
   }
@@ -1253,7 +1254,9 @@
     transition: transform .22s ease;
   }
   .people-panel.mobile-open { transform: translateX(0); }
+  .woven-app.dark > .people-panel { position: fixed; }
   .mobile-people-backdrop { display: block; position: fixed; z-index: 30; inset: 0 0 64px; width: 100%; border: 0; background: #080b1590; }
+  .woven-app.dark > .mobile-people-backdrop { position: fixed; }
   .mobile-people-toggle { display: grid; flex: 0 0 40px; width: 40px; height: 40px; place-items: center; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--soft); font-size: 18px; }
   .app-main > header { height: 72px; padding: 0 14px; gap: 10px; }
   .app-main > header h2 { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1286,4 +1289,12 @@
     grid-template-columns: repeat(2, 1fr);
   }
   .pointer-options { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .break-grid { grid-template-columns: 1fr; }
+  .break-grid article { padding: 18px; }
+  .classic-guess-card, .classic-reaction-card { min-height: 280px !important; padding: 18px !important; }
+  .game-heading h3 { font-size: 17px; }
+  .game-heading p { font-size: 12px; }
+  .jump-game-wrap { margin-top: 14px; }
 }
