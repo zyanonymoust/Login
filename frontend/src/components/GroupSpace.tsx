@@ -18,7 +18,6 @@ type GroupMessage = {
 type Member = {
   userId: number;
   name: string;
-  email: string;
   status: string;
   role: string;
   isMuted: boolean;
@@ -32,12 +31,14 @@ export default function GroupSpace({
   me,
   initialRoomId,
   onRoomsChanged,
+  onRoomRead,
 }: {
   rooms: GroupRoom[];
   people: Person[];
   me: Me;
   initialRoomId?: number | null;
   onRoomsChanged: () => void;
+  onRoomRead: (roomId: number) => void;
 }) {
   const [active, setActive] = useState<GroupRoom | null>(null),
     [messages, setMessages] = useState<GroupMessage[]>([]),
@@ -61,8 +62,8 @@ export default function GroupSpace({
     const room = rooms.find(
       (x) => x.id === initialRoomId && x.status === "accepted",
     );
-    if (room) setActive(room);
-  }, [initialRoomId, rooms]);
+    if (room && active?.id !== room.id) setActive(room);
+  }, [initialRoomId, rooms, active?.id]);
   useEffect(() => {
     if (
       active &&
@@ -97,12 +98,13 @@ export default function GroupSpace({
   }, [active?.id]);
   useEffect(() => {
     if (!active) return;
-    apiRequest<GroupMessage[]>(`/api/groups/${active.id}/messages`).then(
-      setMessages,
-    );
+    apiRequest<GroupMessage[]>(`/api/groups/${active.id}/messages`).then((items) => {
+      setMessages(items);
+      onRoomRead(active.id);
+    });
     apiRequest<Member[]>(`/api/groups/${active.id}/members`).then(setMembers);
     connection?.invoke("JoinRoom", active.id).catch(() => {});
-  }, [active, connection]);
+  }, [active, connection, onRoomRead]);
   const create = async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!newName.trim()) return;
@@ -252,6 +254,7 @@ export default function GroupSpace({
               <strong>{r.name}</strong>
               <small>{r.memberCount} members</small>
             </span>
+            {r.unread > 0 && <b className="room-unread">{r.unread}</b>}
           </button>
         ))}
         {publicRooms.length > 0 && <h4 className="discover-title">Discover public groups</h4>}
@@ -316,7 +319,7 @@ export default function GroupSpace({
                 {members.map((m) => (
                   <div className="member-entry" key={m.userId}>
                     <i className={m.online ? "online-dot" : "offline-dot"} />
-                    <span><strong>{m.name}</strong><em>{m.email}</em>
+                    <span><strong>{m.name}</strong>
                       <small>
                         {m.isMuted ? "Muted" : m.status}
                         {m.role === "owner" ? " · owner" : ""}
@@ -371,7 +374,7 @@ export default function GroupSpace({
                       {members.map((member) => (
                         <div className="permission-member" key={member.userId}>
                           <i className={member.online ? "online-dot" : "offline-dot"} />
-                          <div><strong>{member.name}</strong><small>{member.email}</small><em>{member.role === "owner" ? "Owner" : member.status === "pending" ? "Invitation pending" : member.role === "admin" ? "Administrator" : member.doNotDisturb ? "Do not disturb" : "Member"}</em></div>
+                          <div><strong>{member.name}</strong><em>{member.role === "owner" ? "Owner" : member.status === "pending" ? "Invitation pending" : member.role === "admin" ? "Administrator" : member.doNotDisturb ? "Do not disturb" : "Member"}</em></div>
                           {member.role === "owner" ? <div className="member-owner-badge">Owner</div> : <div className="member-controls"><div className="message-permission"><span><strong>{member.isMuted ? "Cannot talk" : "Can talk"}</strong><small>Send group messages</small></span><button type="button" className={member.isMuted ? "" : "enabled"} onClick={() => muteMember(member)} aria-label={`${member.isMuted ? "Allow" : "Mute"} ${member.name}`}><i /></button></div><div className="member-actions"><button type="button" onClick={() => changeRole(member)}>{member.role === "admin" ? "Remove admin" : "Make admin"}</button><button type="button" onClick={() => transferOwnership(member)}>Transfer owner</button><button type="button" className="danger" onClick={() => removeMember(member)}>Remove</button></div></div>}
                         </div>
                       ))}

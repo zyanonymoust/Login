@@ -15,6 +15,8 @@ type Person = {
   status: string;
   online: boolean;
   friendshipStatus?: string;
+  friendSince?: string;
+  mutualGroups: number;
   incoming: boolean;
   unread: number;
   avatarUrl?: string;
@@ -45,8 +47,8 @@ type Me = {
   avatarUrl?: string;
 };
 type RecentConversation = { kind: "person" | "group"; id: number; name: string; preview: string; activityAt: string; memberCount: number };
-type AppNotification = { id: number; type: string; title: string; body: string; targetKind: "person" | "group"; targetId: number; isRead: boolean; createdAt: string };
-export type GroupRoom = { id:number; name:string; description:string; isPublic:boolean; status:string; role:string; isMuted:boolean; doNotDisturb:boolean; memberCount:number; invitedBy:string; createdAt:string };
+type AppNotification = { id: number; type: string; title: string; body: string; targetKind: "person" | "group"; targetId: number; count: number; isRead: boolean; createdAt: string };
+export type GroupRoom = { id:number; name:string; description:string; isPublic:boolean; status:string; role:string; isMuted:boolean; doNotDisturb:boolean; memberCount:number; invitedBy:string; createdAt:string; unread:number };
 export default function Dashboard() {
   const fileInput = useRef<HTMLInputElement>(null),
     chatHubRef = useRef<HubConnection | null>(null),
@@ -71,6 +73,7 @@ export default function Dashboard() {
     [chatError, setChatError] = useState(""),
     [sending, setSending] = useState(false),
     [showLatestButton, setShowLatestButton] = useState(false),
+    [mobilePeopleOpen, setMobilePeopleOpen] = useState(false),
     [uploading, setUploading] = useState(false),
     [groupRooms, setGroupRooms] = useState<GroupRoom[]>([]),
     [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]),
@@ -115,6 +118,10 @@ export default function Dashboard() {
   const refreshNotifications = useCallback(async () => {
     try { setNotifications(await apiRequest<AppNotification[]>("/api/notifications")); } catch { return; }
   }, []);
+  const handleRoomRead = useCallback((roomId: number) => {
+    setGroupRooms((rooms) => rooms.map((room) => room.id === roomId ? { ...room, unread: 0 } : room));
+    refreshNotifications();
+  }, [refreshNotifications]);
   useEffect(() => {
     apiRequest<Me>("/api/auth/me")
       .then(setMe)
@@ -284,6 +291,7 @@ export default function Dashboard() {
     c.on("GroupMembershipChanged", () => { refreshGroups(); refreshRecent(); });
     c.on("NotificationReceived", (item: { title?: string; body?: string; type?: string }) => {
       refreshNotifications();
+      if (item.type === "group-message") refreshGroups();
       setLiveToast({ title: item.title || "Woven", body: item.body || "You have a new notification.", type: item.type || "activity" });
       if (desktopNotifications && "Notification" in window && window.Notification.permission === "granted" && document.hidden) new window.Notification(item.title || "Woven", { body: item.body || "You have a new notification." });
     });
@@ -303,12 +311,13 @@ export default function Dashboard() {
     others = people.filter((x) => x.friendshipStatus !== "accepted"),
     incomingRequests = people.filter((x) => x.friendshipStatus === "pending" && x.incoming),
     pendingGroups = groupRooms.filter((x) => x.status === "pending"),
-    unread = people.reduce((a, x) => a + x.unread, 0),
+    unread = people.reduce((a, x) => a + x.unread, 0) + groupRooms.reduce((a, x) => a + x.unread, 0),
     notificationCount = notifications.filter((item) => !item.isRead && (item.type === "friend-request" || item.type === "group-invite")).length,
     choose = (p: Person) => {
       setSelected(p);
       setReplyingTo(null);
       setView("chat");
+      setMobilePeopleOpen(false);
     },
     markTargetNotifications = async (targetKind: "person" | "group", targetId: number) => {
       const matches = notifications.filter((item) => !item.isRead && item.targetKind === targetKind && item.targetId === targetId);
@@ -317,7 +326,8 @@ export default function Dashboard() {
     },
     add = async (p: Person) => {
       await apiRequest(`/api/social/friends/${p.id}`, { method: "POST" });
-      refresh();
+      setLiveToast({ title: "Request sent", body: `${p.name} will be notified.`, type: "friend-request-sent" });
+      await refresh();
     },
     acceptFriend = async (p: Person) => {
       await apiRequest(`/api/social/friends/${p.id}/accept`, { method: "POST" });
@@ -393,9 +403,14 @@ export default function Dashboard() {
     },
     deleteMessage = async (message: Message) => {
       if (!window.confirm("Delete this message for both people?")) return;
-      await apiRequest(`/api/messages/item/${message.id}`, { method: "DELETE" });
-      setMessages((items) => items.filter((item) => item.id !== message.id));
-      setMessageDetails(null);
+      try {
+        await apiRequest(`/api/messages/item/${message.id}`, { method: "DELETE" });
+        setMessages((items) => items.filter((item) => item.id !== message.id));
+        setMessageDetails(null);
+      } catch (error) {
+        setChatError(error instanceof Error ? error.message : "This message cannot be deleted.");
+        setMessageDetails(null);
+      }
     },
     uploadAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -595,7 +610,7 @@ export default function Dashboard() {
           </button>
         </div>
       </aside>
-      <section className="people-panel">
+      <section className={`people-panel ${mobilePeopleOpen ? "mobile-open" : ""}`}>
         <div className="panel-title">
           <h2>Woven</h2>
           <button onClick={() => setView("profile")}>＋</button>
@@ -619,9 +634,10 @@ export default function Dashboard() {
           />
           <Group
             title="Public"
-            people={others.filter((x) =>
+            totalCount={others.length}
+            people={query.trim() ? others.filter((x) =>
               x.name.toLowerCase().includes(query.toLowerCase()),
-            )}
+            ) : []}
             selected={selected}
             choose={choose}
             add={add}
@@ -638,8 +654,10 @@ export default function Dashboard() {
           <i className={me.status === "Invisible" ? "offline-dot" : "online-dot"} />
         </div>
       </section>
+      {mobilePeopleOpen && <button className="mobile-people-backdrop" aria-label="Close people list" onClick={() => setMobilePeopleOpen(false)} />}
       <main className="app-main">
         <header>
+          <button className="mobile-people-toggle" aria-label="Open people list" onClick={() => setMobilePeopleOpen(true)}>☰</button>
           <div>
             <small>{view === "chat" ? "CONVERSATION" : "YOUR SPACE"}</small>
             <h2>
@@ -743,7 +761,7 @@ export default function Dashboard() {
             <BoredomBreak />
           </section>
         )}
-        {view === "groups" && <GroupSpace rooms={groupRooms} people={people} me={me} initialRoomId={selectedGroupId} onRoomsChanged={refreshGroups} />}
+        {view === "groups" && <GroupSpace rooms={groupRooms} people={people} me={me} initialRoomId={selectedGroupId} onRoomsChanged={refreshGroups} onRoomRead={handleRoomRead} />}
         {view === "chat" && selected && (
           <section
             className={`chat-view bg-${chatBg.startsWith("data:") ? "custom" : chatBg}`}
@@ -855,7 +873,7 @@ export default function Dashboard() {
                     <div><dt>Received</dt><dd>{formatMessageDateTime(messageDetails.sentAt)}</dd></div>
                     <div><dt>Read</dt><dd>{messageDetails.readAt ? formatMessageDateTime(messageDetails.readAt) : "Not read yet"}</dd></div>
                   </dl>
-                  <div className="message-detail-actions"><button onClick={() => replyToMessage(messageDetails)}>Reply</button>{messageDetails.senderId === (me.id || me.userId) && <><button onClick={() => editMessage(messageDetails)}>Edit message</button><button className="danger" onClick={() => deleteMessage(messageDetails)}>Delete message</button></>}</div>
+                  <div className="message-detail-actions"><button onClick={() => replyToMessage(messageDetails)}>Reply</button>{messageDetails.senderId === (me.id || me.userId) && <><button onClick={() => editMessage(messageDetails)}>Edit message</button>{Date.now() - new Date(messageDetails.sentAt).getTime() <= 300000 ? <button className="danger" onClick={() => deleteMessage(messageDetails)}>Delete for everyone</button> : <span className="delete-expired">Delete available for 5 minutes</span>}</>}</div>
                 </section>
               </div>
             )}
@@ -979,9 +997,10 @@ export default function Dashboard() {
               <h3>{profilePerson.name}</h3>
               <span className="person-profile-status"><i className={profilePerson.online ? "online-dot" : "offline-dot"} />{profilePerson.online ? "Online" : "Offline"}</span>
               <p>{profilePerson.bio || "No description yet."}</p>
+              <div className="profile-friend-facts"><span><b>{profilePerson.mutualGroups || 0}</b> mutual groups</span>{profilePerson.friendSince && <span>Friends since <b>{new Date(profilePerson.friendSince).toLocaleDateString()}</b></span>}</div>
               <div className="person-profile-actions">
                 <button onClick={() => setProfilePerson(null)}>Cancel</button>
-                {profilePerson.friendshipStatus === "accepted" && <button className="danger" onClick={() => removeFriend(profilePerson)}>Remove friend</button>}
+                {profilePerson.friendshipStatus === "accepted" && <><button className="primary-action" onClick={() => { choose(profilePerson); setProfilePerson(null); }}>Message</button><button className="danger" onClick={() => removeFriend(profilePerson)}>Remove friend</button></>}
                 {!profilePerson.friendshipStatus && <button className="primary-action" onClick={() => requestFromProfile(profilePerson)}>Add friend</button>}
                 {profilePerson.friendshipStatus === "pending" && !profilePerson.incoming && <button className="danger-outline" onClick={() => cancelRequestFromProfile(profilePerson)}>Cancel request</button>}
                 {profilePerson.friendshipStatus === "pending" && profilePerson.incoming && <><button className="danger-outline" onClick={() => declineFromProfile(profilePerson)}>Decline</button><button className="primary-action" onClick={() => acceptFromProfile(profilePerson)}>Accept</button></>}
@@ -1172,19 +1191,21 @@ function Group({
   selected,
   choose,
   add,
+  totalCount,
 }: {
   title: string;
   people: Person[];
   selected: Person | null;
   choose: (p: Person) => void;
   add?: (p: Person) => void;
+  totalCount?: number;
 }) {
   const sortedPeople = [...people].sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
   return (
     <div className="people-group">
       <h4>
         {title}
-        <span>{people.length}</span>
+        <span>{totalCount ?? people.length}</span>
       </h4>
       {sortedPeople.map((p) => (
         <div

@@ -14,7 +14,7 @@ public class NotificationsController(AppDbContext db) : ControllerBase
     [HttpGet]
     public async Task<IActionResult> List()
     {
-        return Ok(await db.Notifications.AsNoTracking().Where(x => x.UserId == UserId).OrderByDescending(x => x.CreatedAt).Take(50).Select(x => new { x.Id, x.Type, x.Title, x.Body, x.TargetKind, x.TargetId, x.IsRead, x.CreatedAt }).ToListAsync());
+        return Ok(await db.Notifications.AsNoTracking().Where(x => x.UserId == UserId).OrderByDescending(x => x.CreatedAt).Take(50).Select(x => new { x.Id, x.Type, x.Title, x.Body, x.TargetKind, x.TargetId, x.Count, x.IsRead, x.CreatedAt }).ToListAsync());
     }
 
     [HttpPost("{id:long}/read")]

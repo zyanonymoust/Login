@@ -96,6 +96,7 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Title).HasMaxLength(150).IsRequired();
             entity.Property(x => x.Body).HasMaxLength(500).IsRequired();
             entity.Property(x => x.TargetKind).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Count).HasDefaultValue(1);
             entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
         modelBuilder.Entity<MessageReaction>(entity =>

@@ -19,10 +19,10 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     {
         var me = UserId;
         var memberships = await db.GroupMembers.AsNoTracking().Where(x => x.UserId == me)
-            .Select(x => new { id = x.GroupRoomId, x.GroupRoom.Name, x.GroupRoom.Description, x.GroupRoom.IsPublic, status = x.Status, role = x.Role, x.IsMuted, x.DoNotDisturb, x.GroupRoom.CreatedAt, memberCount = x.GroupRoom.Members.Count(m => m.Status == "accepted"), invitedBy = x.GroupRoom.CreatedBy.Name }).ToListAsync();
+            .Select(x => new { id = x.GroupRoomId, x.GroupRoom.Name, x.GroupRoom.Description, x.GroupRoom.IsPublic, status = x.Status, role = x.Role, x.IsMuted, x.DoNotDisturb, x.GroupRoom.CreatedAt, memberCount = x.GroupRoom.Members.Count(m => m.Status == "accepted"), invitedBy = x.GroupRoom.CreatedBy.Name, unread = db.Notifications.Where(n => n.UserId == me && n.Type == "group-message" && n.TargetKind == "group" && n.TargetId == x.GroupRoomId && !n.IsRead).Sum(n => (int?)n.Count) ?? 0 }).ToListAsync();
         var joinedIds = memberships.Select(x => x.id).ToList();
         var publicRooms = await db.GroupRooms.AsNoTracking().Where(x => x.IsPublic && !joinedIds.Contains(x.Id))
-            .Select(x => new { id = x.Id, x.Name, x.Description, x.IsPublic, status = "available", role = "visitor", IsMuted = false, DoNotDisturb = false, x.CreatedAt, memberCount = x.Members.Count(m => m.Status == "accepted"), invitedBy = x.CreatedBy.Name }).ToListAsync();
+            .Select(x => new { id = x.Id, x.Name, x.Description, x.IsPublic, status = "available", role = "visitor", IsMuted = false, DoNotDisturb = false, x.CreatedAt, memberCount = x.Members.Count(m => m.Status == "accepted"), invitedBy = x.CreatedBy.Name, unread = 0 }).ToListAsync();
         return Ok(memberships.Concat(publicRooms).OrderByDescending(x => x.CreatedAt));
     }
 
@@ -92,14 +92,16 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     public async Task<IActionResult> Members(int roomId)
     {
         if (!await IsAccepted(roomId, UserId)) return Forbid();
-        return Ok(await db.GroupMembers.AsNoTracking().Where(x => x.GroupRoomId == roomId).Select(x => new { x.UserId, x.User.Name, x.User.Email, x.Status, x.Role, x.IsMuted, x.DoNotDisturb, online = x.User.LastSeenAt > DateTime.UtcNow.AddMinutes(-2) }).ToListAsync());
+        return Ok(await db.GroupMembers.AsNoTracking().Where(x => x.GroupRoomId == roomId).Select(x => new { x.UserId, x.User.Name, x.Status, x.Role, x.IsMuted, x.DoNotDisturb, online = x.User.LastSeenAt > DateTime.UtcNow.AddMinutes(-2) }).ToListAsync());
     }
 
     [HttpGet("{roomId:int}/messages")]
     public async Task<IActionResult> Messages(int roomId)
     {
         if (!await IsAccepted(roomId, UserId)) return Forbid();
-        return Ok(await db.GroupMessages.AsNoTracking().Where(x => x.GroupRoomId == roomId).OrderBy(x => x.Id).Take(300).Select(x => new { x.Id, x.GroupRoomId, x.SenderId, senderName = x.Sender.Name, x.Content, x.SentAt }).ToListAsync());
+        var messages = await db.GroupMessages.AsNoTracking().Where(x => x.GroupRoomId == roomId).OrderBy(x => x.Id).Take(300).Select(x => new { x.Id, x.GroupRoomId, x.SenderId, senderName = x.Sender.Name, x.Content, x.SentAt }).ToListAsync();
+        await db.Notifications.Where(x => x.UserId == UserId && x.Type == "group-message" && x.TargetKind == "group" && x.TargetId == roomId && !x.IsRead).ExecuteUpdateAsync(x => x.SetProperty(n => n.IsRead, true));
+        return Ok(messages);
     }
 
     [HttpPost("{roomId:int}/messages")]
@@ -112,7 +114,7 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
         var name = await db.Users.Where(x => x.Id == UserId).Select(x => x.Name).SingleAsync();
         var roomName = await db.GroupRooms.Where(x => x.Id == roomId).Select(x => x.Name).SingleAsync();
         var recipients = await db.GroupMembers.Where(x => x.GroupRoomId == roomId && x.UserId != UserId && x.Status == "accepted" && !x.DoNotDisturb).Select(x => x.UserId).ToListAsync();
-        db.Notifications.AddRange(recipients.Select(userId => new Notification { UserId = userId, Type = "group-message", Title = roomName, Body = $"{name}: {content}", TargetKind = "group", TargetId = roomId }));
+        foreach (var userId in recipients) await AddOrGroupNotification(userId, roomName, $"{name}: {content}", roomId);
         await db.SaveChangesAsync();
         var payload = new { row.Id, row.GroupRoomId, row.SenderId, senderName = name, row.Content, row.SentAt };
         await hub.Clients.Group(ChatHub.RoomGroup(roomId)).SendAsync("GroupMessageReceived", payload);
@@ -203,6 +205,12 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
 
     private Task<bool> IsAccepted(int roomId, int userId) => db.GroupMembers.AnyAsync(x => x.GroupRoomId == roomId && x.UserId == userId && x.Status == "accepted");
     private Task<bool> IsOwner(int roomId, int userId) => db.GroupMembers.AnyAsync(x => x.GroupRoomId == roomId && x.UserId == userId && x.Status == "accepted" && x.Role == "owner");
+    private async Task AddOrGroupNotification(int userId, string title, string body, int roomId)
+    {
+        var existing = await db.Notifications.FirstOrDefaultAsync(x => x.UserId == userId && x.Type == "group-message" && x.TargetKind == "group" && x.TargetId == roomId && !x.IsRead);
+        if (existing is null) db.Notifications.Add(new Notification { UserId = userId, Type = "group-message", Title = title, Body = body, TargetKind = "group", TargetId = roomId });
+        else { existing.Title = title; existing.Body = body; existing.Count++; existing.CreatedAt = DateTime.UtcNow; }
+    }
     public record CreateRoom(string Name, bool IsPublic, string? Description);
     public record SendMessage(string Content);
     public record UpdateRoom(string Name, string Description);

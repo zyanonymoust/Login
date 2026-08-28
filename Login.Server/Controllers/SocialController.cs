@@ -20,10 +20,12 @@ public class SocialController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
         var me = UserId;
         var links = await db.Friendships.Where(x => x.RequesterId == me || x.AddresseeId == me).ToListAsync();
         var users = await db.Users.AsNoTracking().Where(x => x.Id != me).OrderBy(x => x.Name).ToListAsync();
+        var myGroupIds = await db.GroupMembers.AsNoTracking().Where(x => x.UserId == me && x.Status == "accepted").Select(x => x.GroupRoomId).ToListAsync();
+        var mutualGroups = await db.GroupMembers.AsNoTracking().Where(x => x.UserId != me && x.Status == "accepted" && myGroupIds.Contains(x.GroupRoomId)).GroupBy(x => x.UserId).Select(x => new { UserId = x.Key, Count = x.Count() }).ToDictionaryAsync(x => x.UserId, x => x.Count);
         return Ok(users.Select(u => {
             var link = links.FirstOrDefault(x => x.RequesterId == u.Id || x.AddresseeId == u.Id);
             var invisible = u.Status == "Invisible";
-            return new { u.Id, u.Name, u.Bio, avatarUrl = u.AvatarData != null ? $"/api/social/avatar/{u.Id}" : null, status = invisible ? "Offline" : u.Status, online = !invisible && u.LastSeenAt > DateTime.UtcNow.AddMinutes(-2), friendshipStatus = link?.Status, incoming = link?.AddresseeId == me, unread = db.Messages.Count(m => m.SenderId == u.Id && m.RecipientId == me && m.ReadAt == null) };
+            return new { u.Id, u.Name, u.Bio, avatarUrl = u.AvatarData != null ? $"/api/social/avatar/{u.Id}" : null, status = invisible ? "Offline" : u.Status, online = !invisible && u.LastSeenAt > DateTime.UtcNow.AddMinutes(-2), friendshipStatus = link?.Status, friendSince = link?.Status == "accepted" ? link.CreatedAt : (DateTime?)null, mutualGroups = mutualGroups.GetValueOrDefault(u.Id), incoming = link?.AddresseeId == me, unread = db.Messages.Count(m => m.SenderId == u.Id && m.RecipientId == me && m.ReadAt == null) };
         }));
     }
 

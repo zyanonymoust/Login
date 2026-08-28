@@ -354,6 +354,7 @@
   flex-direction: column;
   min-height: 0;
 }
+.mobile-people-toggle, .mobile-people-backdrop { display: none; }
 .panel-title {
   display: flex;
   align-items: center;
@@ -713,6 +714,10 @@
 .person-profile-card h3 { margin: 14px 0 5px; font: 800 24px Manrope; }
 .person-profile-card > p { width: 100%; margin: 20px 0 10px; padding: 14px; border-radius: 12px; background: var(--soft); line-height: 1.55; text-align: center; }
 .person-profile-card > small { color: var(--muted); }
+.profile-friend-facts { display: flex; width: 100%; justify-content: center; gap: 12px; margin: 2px 0 12px; color: var(--muted); font-size: 12px; }
+.profile-friend-facts span { padding: 7px 10px; border-radius: 10px; background: var(--soft); }
+.profile-friend-facts b { color: var(--ink); }
+.delete-expired { align-self: center; color: var(--muted); font-size: 11px; }
 .person-profile-status { display: flex; align-items: center; gap: 7px; color: var(--muted); }
 .person-profile-close { position: absolute; top: 12px; right: 14px; border: 0; color: var(--muted); background: transparent; font-size: 25px; cursor: pointer; }
 .person-profile-actions { display: flex; width: 100%; gap: 10px; margin-top: 22px; }
@@ -1238,8 +1243,27 @@
     display: none;
   }
   .people-panel {
-    display: none;
+    display: flex;
+    position: fixed;
+    z-index: 31;
+    inset: 0 auto 64px 0;
+    width: min(340px, 88vw);
+    transform: translateX(-105%);
+    box-shadow: 20px 0 60px #0005;
+    transition: transform .22s ease;
   }
+  .people-panel.mobile-open { transform: translateX(0); }
+  .mobile-people-backdrop { display: block; position: fixed; z-index: 30; inset: 0 0 64px; width: 100%; border: 0; background: #080b1590; }
+  .mobile-people-toggle { display: grid; flex: 0 0 40px; width: 40px; height: 40px; place-items: center; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--soft); font-size: 18px; }
+  .app-main > header { height: 72px; padding: 0 14px; gap: 10px; }
+  .app-main > header h2 { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .header-tools { margin-left: auto; }
+  .chat-view { height: calc(100dvh - 136px); min-height: 0; }
+  .chat-meta { padding: 10px 12px; flex-wrap: wrap; }
+  .chat-search { order: 4; flex-basis: calc(100% - 52px); margin-left: 0; }
+  .composer { padding: 10px; }
+  .group-space { height: calc(100dvh - 136px); }
+  .profile-friend-facts { flex-direction: column; text-align: center; }
   .app-main {
     min-height: 100vh;
     padding-bottom: 64px;
