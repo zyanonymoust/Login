@@ -1018,7 +1018,7 @@
 .game-shelf { width: 100%; box-sizing: border-box; padding: 3px 3px 15px; }
 .break-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; width: 100%; }
 .break-grid article { min-height: 210px; padding: 23px; border: 1px solid var(--line); border-radius: 18px; background: white; box-shadow: 0 10px 30px #211d310b; }
-.break-grid > .jump-game-card { width: 100%; min-width: 0; margin: 0 auto; justify-self: center; }
+.break-grid > .jump-game-card { width: 100% !important; max-width: none !important; min-width: 0; margin: 0 !important; justify-self: stretch; }
 .prompt-card { background-image: radial-gradient(circle at 95% 5%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 38%) !important; }
 .reaction-card { background-image: radial-gradient(circle at 95% 5%, #ffd78c55, transparent 38%) !important; }
 .activity-icon { width: 38px; height: 38px; display: grid; place-items: center; margin-bottom: 20px; border-radius: 11px; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, white); font-size: 18px; }
@@ -1046,11 +1046,11 @@
 .game-heading p { margin: 0; color: var(--muted); font-size: 14px; }
 .guess-range { display: flex; align-items: center; gap: 11px; margin: 38px 0 25px; color: var(--muted); font-weight: 700; }
 .range-line { flex: 1; height: 7px; border-radius: 10px; background: linear-gradient(90deg, #7b68ee, #49b7ff, #53d69d); }
-.game-input-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
-.game-input-row input { width: 100%; height: 50px; padding: 0 16px; border: 1px solid var(--line); border-radius: 13px; color: var(--ink); background: var(--soft); outline: none; }
+.game-input-row { display: grid; grid-template-columns: minmax(0, 1fr) 88px; gap: 14px; align-items: center; }
+.game-input-row input { width: 100%; min-width: 0; height: 50px; box-sizing: border-box; padding: 0 16px; border: 1px solid var(--line); border-radius: 13px; color: var(--ink); background: var(--soft); outline: none; }
 .game-input-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 13%, transparent); }
-.game-input-row button { min-height: 50px; padding: 0 22px; border: 0; border-radius: 13px; color: white; background: var(--accent); font-size: 14px; font-weight: 800; white-space: nowrap; }
-.game-message { min-height: 92px; margin-top: 22px; padding: 17px; border-radius: 15px; background: var(--soft); }
+.game-input-row button { min-height: 46px; padding: 0 16px; border: 0; border-radius: 11px; color: white; background: var(--accent); box-shadow: 0 7px 18px color-mix(in srgb, var(--accent) 22%, transparent); font-size: 13px; font-weight: 800; white-space: nowrap; }
+.game-message { height: 135px; min-height: 135px; box-sizing: border-box; margin-top: 22px; padding: 17px; border-radius: 15px; background: var(--soft); }
 .game-message.success { background: #34c77a21; }
 .game-message p { margin: 0 0 10px; font-weight: 700; }
 .game-message span { color: var(--muted); font-size: 13px; }
@@ -1058,18 +1058,18 @@
 .reaction-score div { display: flex; flex-direction: column; gap: 7px; padding: 16px; border-radius: 15px; background: var(--soft); }
 .reaction-score span { color: var(--muted); font-size: 12px; text-transform: uppercase; }
 .reaction-score strong { font-size: 20px; }
-.reaction-start, .reaction-zone { width: 100%; height: 118px; border: 0; border-radius: 18px; color: white; font-weight: 800; cursor: pointer; }
+.reaction-start, .reaction-zone { width: 100%; height: 135px; border: 0; border-radius: 18px; color: white; font-weight: 800; cursor: pointer; }
 .reaction-start { background: var(--accent); }
 .reaction-zone.waiting { background: linear-gradient(135deg, #ef5365, #d9364c); }
 .reaction-zone.ready { background: linear-gradient(135deg, #39d98a, #14a762); animation: reaction-ready .65s infinite alternate; }
-.reaction-result { min-height: 135px; padding: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; border-radius: 18px; text-align: center; }
+.reaction-result { height: 135px; min-height: 135px; box-sizing: border-box; padding: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; border-radius: 18px; text-align: center; }
 .reaction-result.early { background: #ef53651f; }
 .reaction-result.finished { background: #34c77a21; }
 .reaction-result strong { font-size: 27px; }
 .reaction-result span { color: var(--muted); }
 .reaction-result button { min-height: 40px; margin-top: 5px; padding: 0 20px; border: 0; border-radius: 10px; color: white; background: var(--accent); font-weight: 800; }
 .jump-game-wrap { width: 100%; min-width: 0; margin-top: 24px; }
-.jump-game-wrap .jump-game-card { width: min(820px, 100%); min-width: 0; margin-inline: auto; }
+.jump-game-wrap .jump-game-card { width: 100%; max-width: none; min-width: 0; margin-inline: 0; }
 .dark-mode-setting { width: 100%; display: flex; align-items: center; gap: 13px; margin-top: 26px; padding: 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--soft); color: var(--ink); text-align: left; }
 .dark-mode-setting > span { width: 37px; height: 37px; display: grid; place-items: center; border-radius: 10px; background: var(--accent); color: white; font-size: 18px; }
 .dark-mode-setting > div { display: flex; flex: 1; flex-direction: column; gap: 4px; }
@@ -1317,10 +1317,10 @@
   .break-grid { grid-template-columns: 1fr; }
   .break-grid article { width: 100%; max-width: 380px; box-sizing: border-box; justify-self: center; padding: 14px; }
   .classic-guess-card, .classic-reaction-card { min-height: 245px !important; padding: 15px !important; }
-  .game-input-row { width: 100%; grid-template-columns: minmax(0, 1fr) 48px; justify-content: stretch; gap: 7px; }
+  .game-input-row { width: 100%; grid-template-columns: minmax(0, 1fr) 48px; justify-content: stretch; gap: 10px; }
   .game-input-row input { height: 42px; padding: 0 12px; border-radius: 10px; }
   .game-input-row button { width: 48px; min-height: 32px; padding: 0 5px; border-radius: 8px; font-size: 9px; }
-  .reaction-start, .reaction-zone, .reaction-result { height: 132px; min-height: 132px; box-sizing: border-box; border-radius: 15px; font-size: 13px; }
+  .reaction-start, .reaction-zone, .reaction-result { height: 90px; min-height: 90px; box-sizing: border-box; border-radius: 14px; font-size: 12px; }
   .reaction-result { padding: 10px; gap: 5px; }
   .reaction-result strong { font-size: 19px; }
   .reaction-result span { font-size: 10px; }
@@ -1329,11 +1329,12 @@
   .game-heading p { font-size: 12px; }
   .game-icon { width: 43px; height: 43px; border-radius: 13px; font-size: 20px; }
   .guess-range { margin: 16px 0 13px; }
-  .game-message { min-height: 58px; margin-top: 12px; padding: 11px; font-size: 12px; }
+  .game-message { height: 90px; min-height: 90px; margin-top: 12px; padding: 11px; font-size: 12px; }
   .game-message p { margin-bottom: 6px; }
   .reaction-score { margin: 14px 0 12px; }
   .reaction-score div { padding: 11px; }
   .jump-game-card { margin-inline: auto !important; padding: 12px !important; }
+  .break-grid > .jump-game-card { max-width: 380px !important; justify-self: center; }
   .jump-game-header { gap: 10px; }
   .jump-game-instructions { margin-top: 10px; }
 }
