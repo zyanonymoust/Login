@@ -1181,7 +1181,7 @@
   .landing-nav {
     padding: 0 18px;
   }
-  .landing-nav a:not(.primary) {
+  .landing-nav > div a:not(.primary) {
     display: none;
   }
   .hero {
@@ -1213,16 +1213,14 @@
     min-height: 100vh;
   }
   .app-sidebar {
-    position: fixed;
+    position: fixed !important;
     z-index: 10;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    inset: auto 0 0 0 !important;
     height: 64px;
     flex-direction: row;
     padding: 8px 12px;
   }
-  .woven-app.dark > .app-sidebar { position: fixed; }
+  .woven-app.dark > .app-sidebar { position: fixed !important; inset: auto 0 0 0 !important; }
   .app-sidebar .app-logo {
     display: none;
   }
@@ -1291,10 +1289,43 @@
   .pointer-options { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
+  .app-sidebar nav, .side-bottom { flex: 1; }
+  .landing-nav { height: 66px; padding: 0 14px; }
+  .landing-nav .brand { display: flex; font-size: 17px; }
+  .landing-nav .brand span { width: 34px; height: 34px; border-radius: 10px; }
+  .landing-nav .primary.small { padding: 9px 12px; font-size: 12px; }
+  .hero { padding: 42px 14px 34px; }
+  .eyebrow { padding: 7px 11px; font-size: 11px; }
+  .hero h1 { margin: 18px 0 16px; font-size: clamp(38px, 12vw, 51px); line-height: 1.04; letter-spacing: -2px; }
+  .hero > p { max-width: 340px; font-size: 15px; line-height: 1.55; }
+  .hero-actions { gap: 8px; margin: 25px 0; }
+  .hero-actions .primary, .hero-actions .secondary { justify-content: center; min-width: 0; padding: 12px 14px; font-size: 13px; }
+  .trust { gap: 6px; font-size: 11px; }
+  .product-preview { width: calc(100% - 24px); height: 370px; margin: 18px auto 55px; grid-template-columns: 48px 1fr; border-radius: 18px; }
+  .product-preview aside { padding: 18px 10px; gap: 20px; }
+  .product-preview aside i { width: 19px; height: 19px; }
+  .preview-chat { min-width: 0; padding: 22px 15px; }
+  .preview-chat h3 { margin-bottom: 30px; font-size: 20px; }
+  .bubble { max-width: 82%; padding: 10px 12px; font-size: 12px; }
+  .fake-input { margin-top: 28px; padding: 11px; font-size: 11px; }
+  .features { gap: 22px; padding-bottom: 60px; }
+  .home-view { padding: 12px; }
+  .welcome-block { min-height: 170px; padding: 22px 18px; border-radius: 17px; }
+  .welcome-block h1 { margin: 9px 0; font-size: 27px; line-height: 1.06; letter-spacing: -1px; }
+  .welcome-block p { margin: 0; font-size: 12px; }
+  .quick-section { margin-top: 18px; gap: 12px; }
+  .quick-heading { margin-top: 19px; }
+  .quick-heading h3, .break-heading h3 { font-size: 17px; }
+  .quick-grid > button { min-height: 74px; padding: 12px; }
+  .friendship-spark-card { min-height: 210px; padding: 18px; }
+  .boredom-break { margin-top: 25px; }
+  .break-heading p { display: none; }
   .break-grid { grid-template-columns: 1fr; }
-  .break-grid article { padding: 18px; }
+  .break-grid article { width: 100%; max-width: 430px; box-sizing: border-box; justify-self: center; padding: 16px; }
   .classic-guess-card, .classic-reaction-card { min-height: 280px !important; padding: 18px !important; }
   .game-heading h3 { font-size: 17px; }
   .game-heading p { font-size: 12px; }
-  .jump-game-wrap { margin-top: 14px; }
+  .jump-game-card { margin-inline: auto !important; padding: 12px !important; }
+  .jump-game-header { gap: 10px; }
+  .jump-game-instructions { margin-top: 10px; }
 }

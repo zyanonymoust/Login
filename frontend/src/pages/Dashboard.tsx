@@ -573,19 +573,25 @@ export default function Dashboard() {
           <button
             aria-label="Home"
             className={view === "home" ? "active" : ""}
-            onClick={() => setView("home")}
+            onClick={() => { setMobilePeopleOpen(false); setView("home"); }}
           >
             ⌂<span>Home</span>
           </button>
           <button
             aria-label="Messages"
             className={view === "chat" ? "active" : ""}
-            onClick={() => selected && setView("chat")}
+            onClick={() => {
+              if (window.matchMedia("(max-width: 900px)").matches) {
+                setMobilePeopleOpen(true);
+                return;
+              }
+              if (selected) setView("chat");
+            }}
           >
             💬<span>Messages</span>
             {unread > 0 && <b>{unread}</b>}
           </button>
-          <button aria-label="Groups" className={view === "groups" ? "active" : ""} onClick={() => setView("groups")}>
+          <button aria-label="Groups" className={view === "groups" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}>
             👥<span>Groups</span>{pendingGroups.length > 0 && <b>{pendingGroups.length}</b>}
           </button>
         </nav>
