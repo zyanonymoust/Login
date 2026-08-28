@@ -1018,7 +1018,7 @@
 .game-shelf { width: 100%; box-sizing: border-box; padding: 3px 3px 15px; }
 .break-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; width: 100%; }
 .break-grid article { min-height: 210px; padding: 23px; border: 1px solid var(--line); border-radius: 18px; background: white; box-shadow: 0 10px 30px #211d310b; }
-.break-grid > .jump-game-card { width: min(820px, 100%); min-width: 0; margin: 0 auto; justify-self: center; }
+.break-grid > .jump-game-card { width: 100%; min-width: 0; margin: 0 auto; justify-self: center; }
 .prompt-card { background-image: radial-gradient(circle at 95% 5%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 38%) !important; }
 .reaction-card { background-image: radial-gradient(circle at 95% 5%, #ffd78c55, transparent 38%) !important; }
 .activity-icon { width: 38px; height: 38px; display: grid; place-items: center; margin-bottom: 20px; border-radius: 11px; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, white); font-size: 18px; }
@@ -1317,7 +1317,7 @@
   .break-grid { grid-template-columns: 1fr; }
   .break-grid article { width: 100%; max-width: 380px; box-sizing: border-box; justify-self: center; padding: 14px; }
   .classic-guess-card, .classic-reaction-card { min-height: 245px !important; padding: 15px !important; }
-  .game-input-row { grid-template-columns: minmax(0, 220px) 48px; justify-content: center; gap: 7px; }
+  .game-input-row { width: 100%; grid-template-columns: minmax(0, 1fr) 48px; justify-content: stretch; gap: 7px; }
   .game-input-row input { height: 42px; padding: 0 12px; border-radius: 10px; }
   .game-input-row button { width: 48px; min-height: 32px; padding: 0 5px; border-radius: 8px; font-size: 9px; }
   .reaction-start, .reaction-zone, .reaction-result { height: 132px; min-height: 132px; box-sizing: border-box; border-radius: 15px; font-size: 13px; }
