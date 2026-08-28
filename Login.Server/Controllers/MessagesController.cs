@@ -57,6 +57,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
         var me = UserId;
         var rows = await db.Messages.Where(x => x.Id > after && ((x.SenderId == me && x.RecipientId == otherId) || (x.SenderId == otherId && x.RecipientId == me))).OrderBy(x => x.Id).Take(200).Select(x => new { x.Id, x.SenderId, x.RecipientId, x.Content, x.SentAt, x.ReadAt, isUnread = x.SenderId == otherId && x.RecipientId == me && x.ReadAt == null, x.AttachmentName, x.AttachmentContentType, attachmentUrl = x.AttachmentData != null ? $"/api/messages/attachment/{x.Id}" : null, replyTo = x.ReplyTo == null ? null : new { x.ReplyTo.Id, x.ReplyTo.SenderId, x.ReplyTo.Content, x.ReplyTo.AttachmentName }, reactions = x.Reactions.GroupBy(r => r.Emoji).Select(g => new { emoji = g.Key, count = g.Count(), reactedByMe = g.Any(r => r.UserId == me) }) }).ToListAsync();
         var readCount = await db.Messages.Where(x => x.SenderId == otherId && x.RecipientId == me && x.ReadAt == null).ExecuteUpdateAsync(s => s.SetProperty(x => x.ReadAt, DateTime.UtcNow));
+        await db.Notifications.Where(x => x.UserId == me && x.Type == "message" && x.TargetKind == "person" && x.TargetId == otherId && !x.IsRead).ExecuteUpdateAsync(x => x.SetProperty(n => n.IsRead, true));
         if (readCount > 0) await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("MessagesRead", new { readBy = me, readAt = DateTime.UtcNow });
         return Ok(rows);
     }

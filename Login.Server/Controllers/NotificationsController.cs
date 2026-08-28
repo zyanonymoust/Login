@@ -30,4 +30,11 @@ public class NotificationsController(AppDbContext db) : ControllerBase
         await db.Notifications.Where(x => x.UserId == UserId && !x.IsRead).ExecuteUpdateAsync(x => x.SetProperty(n => n.IsRead, true));
         return NoContent();
     }
+
+    [HttpDelete("read")]
+    public async Task<IActionResult> DeleteRead()
+    {
+        await db.Notifications.Where(x => x.UserId == UserId && x.IsRead).ExecuteDeleteAsync();
+        return NoContent();
+    }
 }
