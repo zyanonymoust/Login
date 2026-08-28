@@ -11,6 +11,7 @@ namespace Login.Server.Hubs;
 public class ChatHub(AppDbContext db) : Hub
 {
     private static readonly ConcurrentDictionary<string, HashSet<int>> MeetingRooms = new();
+    private static readonly ConcurrentDictionary<int, int> UserConnections = new();
     public static string UserGroup(int userId) => $"user-{userId}";
     public static string RoomGroup(int roomId) => $"room-{roomId}";
     private static string MeetingGroup(int roomId) => $"meeting-{roomId}";
@@ -60,7 +61,8 @@ public class ChatHub(AppDbContext db) : Hub
             await Groups.AddToGroupAsync(Context.ConnectionId, UserGroup(userId));
             var user = await db.Users.FindAsync(userId);
             if (user is not null) { user.LastSeenAt = DateTime.UtcNow; await db.SaveChangesAsync(); }
-            await Clients.All.SendAsync("PresenceChanged", new { userId, online = true });
+            var connections = UserConnections.AddOrUpdate(userId, 1, (_, count) => count + 1);
+            if (connections == 1) await Clients.All.SendAsync("PresenceChanged", new { userId, online = true, status = user?.Status ?? "Available" });
         }
         await base.OnConnectedAsync();
     }
@@ -72,7 +74,12 @@ public class ChatHub(AppDbContext db) : Hub
         {
             var user = await db.Users.FindAsync(userId);
             if (user is not null) { user.LastSeenAt = DateTime.UtcNow; await db.SaveChangesAsync(); }
-            await Clients.All.SendAsync("PresenceChanged", new { userId, online = false });
+            var connections = UserConnections.AddOrUpdate(userId, 0, (_, count) => Math.Max(0, count - 1));
+            if (connections == 0)
+            {
+                UserConnections.TryRemove(userId, out _);
+                await Clients.All.SendAsync("PresenceChanged", new { userId, online = false, status = user?.Status ?? "Away" });
+            }
         }
         if (MeetingRooms.TryRemove(Context.ConnectionId, out var rooms))
             foreach (var roomId in rooms) await Clients.OthersInGroup(MeetingGroup(roomId)).SendAsync("MeetingParticipantLeft", new { roomId, connectionId = Context.ConnectionId });

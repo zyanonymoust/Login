@@ -275,7 +275,9 @@ export default function Dashboard() {
     c.on("TypingChanged", (item: { userId: number; isTyping: boolean }) => {
       if (item.userId === selectedId) setIsTyping(item.isTyping);
     });
-    c.on("PresenceChanged", refresh);
+    c.on("PresenceChanged", (item: { userId: number; online: boolean; status?: string }) => {
+      setPeople((items) => items.map((person) => person.id === item.userId ? { ...person, online: item.online, status: item.status || person.status } : person));
+    });
     c.on("FriendRequestReceived", refresh);
     c.on("FriendRequestUpdated", refresh);
     c.on("GroupInviteReceived", refreshGroups);
@@ -757,7 +759,7 @@ export default function Dashboard() {
                   <i
                     className={selected.online ? "online-dot" : "offline-dot"}
                   />
-                  {selected.online ? "Online now" : selected.status}
+                  {selected.online ? "Online" : "Offline"}
                 </small>
               </span>
               <label className="chat-search"><span>⌕</span><input value={chatSearch} onChange={(event) => setChatSearch(event.target.value)} placeholder="Search messages" /></label>
@@ -971,7 +973,7 @@ export default function Dashboard() {
               <button className="person-profile-close" aria-label="Close profile" onClick={() => setProfilePerson(null)}>×</button>
               <Avatar name={profilePerson.name} avatarUrl={profilePerson.avatarUrl} />
               <h3>{profilePerson.name}</h3>
-              <span className="person-profile-status"><i className={profilePerson.online ? "online-dot" : "offline-dot"} />{profilePerson.online ? "Online" : profilePerson.status}</span>
+              <span className="person-profile-status"><i className={profilePerson.online ? "online-dot" : "offline-dot"} />{profilePerson.online ? "Online" : "Offline"}</span>
               <p>{profilePerson.bio || "No description yet."}</p>
               <div className="person-profile-actions">
                 <button onClick={() => setProfilePerson(null)}>Cancel</button>
@@ -1191,7 +1193,7 @@ function Group({
             </span>
             <span>
               <strong>{p.name}</strong>
-              <small>{p.online ? "Online" : p.status || "Away"}</small>
+              <small>{p.online ? "Online" : "Offline"}</small>
             </span>
             {p.unread > 0 && <b>{p.unread}</b>}
           </button>
