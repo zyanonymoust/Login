@@ -1214,13 +1214,14 @@
   }
   .app-sidebar {
     position: fixed !important;
-    z-index: 10;
+    z-index: 100 !important;
     inset: auto 0 0 0 !important;
     height: 64px;
+    box-sizing: border-box;
     flex-direction: row;
     padding: 8px 12px;
   }
-  .woven-app.dark > .app-sidebar { position: fixed !important; inset: auto 0 0 0 !important; }
+  .woven-app.dark > .app-sidebar { position: fixed !important; z-index: 100 !important; inset: auto 0 0 0 !important; }
   .app-sidebar .app-logo {
     display: none;
   }
@@ -1237,6 +1238,7 @@
   }
   .app-sidebar button {
     flex: 1;
+    min-width: 0;
   }
   .app-sidebar button span {
     display: none;
