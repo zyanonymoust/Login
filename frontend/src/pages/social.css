@@ -1317,14 +1317,14 @@
   .break-grid { grid-template-columns: 1fr; }
   .break-grid article { width: 100%; max-width: 380px; box-sizing: border-box; justify-self: center; padding: 14px; }
   .classic-guess-card, .classic-reaction-card { min-height: 245px !important; padding: 15px !important; }
-  .game-input-row { gap: 7px; }
+  .game-input-row { grid-template-columns: minmax(0, 220px) 48px; justify-content: center; gap: 7px; }
   .game-input-row input { height: 42px; padding: 0 12px; border-radius: 10px; }
-  .game-input-row button { width: 56px; min-height: 36px; padding: 0 7px; border-radius: 9px; font-size: 10px; }
-  .reaction-start, .reaction-zone, .reaction-result { height: 76px; min-height: 76px; box-sizing: border-box; border-radius: 13px; font-size: 12px; }
-  .reaction-result { padding: 8px; gap: 4px; }
+  .game-input-row button { width: 48px; min-height: 32px; padding: 0 5px; border-radius: 8px; font-size: 9px; }
+  .reaction-start, .reaction-zone, .reaction-result { height: 132px; min-height: 132px; box-sizing: border-box; border-radius: 15px; font-size: 13px; }
+  .reaction-result { padding: 10px; gap: 5px; }
   .reaction-result strong { font-size: 19px; }
   .reaction-result span { font-size: 10px; }
-  .reaction-result button { min-height: 36px; padding: 0 14px; font-size: 11px; }
+  .reaction-result button { min-height: 32px; margin-top: 2px; padding: 0 13px; font-size: 10px; }
   .game-heading h3 { font-size: 17px; }
   .game-heading p { font-size: 12px; }
   .game-icon { width: 43px; height: 43px; border-radius: 13px; font-size: 20px; }
