@@ -95,9 +95,6 @@ export default function Dashboard() {
     ),
     [chatBg, setChatBg] = useState(
       () => localStorage.getItem("woven-chat-bg") || "default",
-    ),
-    [pointerEffect, setPointerEffect] = useState(
-      () => localStorage.getItem("woven-pointer-effect") || "default",
     );
   const selectedId = selected?.id;
   const refresh = useCallback(async () => {
@@ -180,27 +177,6 @@ export default function Dashboard() {
     const timer = window.setTimeout(() => setLiveToast(null), 5000);
     return () => window.clearTimeout(timer);
   }, [liveToast]);
-  useEffect(() => {
-    localStorage.setItem("woven-pointer-effect", pointerEffect);
-    if (pointerEffect === "default" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let lastPaint = 0;
-    const paint = (event: PointerEvent) => {
-      if (event.pointerType === "touch" || performance.now() - lastPaint < 14) return;
-      lastPaint = performance.now();
-      const particle = document.createElement("i");
-      particle.className = `pointer-particle ${pointerEffect}`;
-      particle.style.left = `${event.clientX}px`;
-      particle.style.top = `${event.clientY}px`;
-      if (pointerEffect === "sparkles") particle.textContent = "✦";
-      document.body.appendChild(particle);
-      window.setTimeout(() => particle.remove(), 800);
-    };
-    window.addEventListener("pointermove", paint, { passive: true });
-    return () => {
-      window.removeEventListener("pointermove", paint);
-      document.querySelectorAll(".pointer-particle").forEach((item) => item.remove());
-    };
-  }, [pointerEffect]);
   useEffect(() => {
     let timer = me.status === "Available" ? window.setTimeout(setAway, 300000) : 0;
     async function setAway() {
@@ -385,7 +361,7 @@ export default function Dashboard() {
       setConversationMuted(result.muted);
     },
     toggleDesktopNotifications = async () => {
-      if (typeof window.Notification === "undefined") { window.alert("Desktop notifications are not supported by this browser."); return; }
+      if (typeof window.Notification === "undefined") { window.alert("Notifications are not supported by this browser."); return; }
       if (!desktopNotifications) {
         const permission = await window.Notification.requestPermission();
         if (permission !== "granted") return;
@@ -663,7 +639,6 @@ export default function Dashboard() {
       {mobilePeopleOpen && <button className="mobile-people-backdrop" aria-label="Close people list" onClick={() => setMobilePeopleOpen(false)} />}
       <main className="app-main">
         <header>
-          <button className="mobile-people-toggle" aria-label="Open people list" onClick={() => setMobilePeopleOpen(true)}>☰</button>
           <div>
             <small>{view === "chat" ? "CONVERSATION" : "YOUR SPACE"}</small>
             <h2>
@@ -943,31 +918,8 @@ export default function Dashboard() {
               <i className={darkMode ? "enabled" : ""} />
             </button>
             <button className="dark-mode-setting" onClick={toggleDesktopNotifications}>
-              <span>🔔</span><div><strong>Desktop notifications</strong><small>Show a notification when Woven is in the background.</small></div><i className={desktopNotifications ? "enabled" : ""} />
+              <span>🔔</span><div><strong>Notifications</strong><small>Show a notification when Woven is in the background.</small></div><i className={desktopNotifications ? "enabled" : ""} />
             </button>
-            <div className="pointer-settings">
-              <h3>Pointer style</h3>
-              <p>Choose an effect that follows your mouse.</p>
-              <div className="pointer-options">
-                {[
-                  ["default", "↖", "Default"],
-                  ["meteor", "☄", "Meteor tail"],
-                  ["sparkles", "✦", "Sparkles"],
-                  ["glow", "●", "Soft glow"],
-                ].map(([value, icon, label]) => (
-                  <button
-                    type="button"
-                    className={pointerEffect === value ? "active" : ""}
-                    onClick={() => setPointerEffect(value)}
-                    key={value}
-                  >
-                    <i className={`pointer-preview ${value}`}>{icon}</i>
-                    <span>{label}</span>
-                    {pointerEffect === value && <b>✓</b>}
-                  </button>
-                ))}
-              </div>
-            </div>
             <div className="background-settings">
               <h3>Chat background</h3>
               <p>Choose a built-in style or use your own image.</p>
