@@ -60,7 +60,7 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
         db.Notifications.Add(new Notification { UserId = userId, Type = "group-invite", Title = room.Name, Body = $"{inviter} invited you to join", TargetKind = "group", TargetId = roomId });
         await db.SaveChangesAsync();
         await hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("GroupInviteReceived", new { roomId });
-        await hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("NotificationReceived", new { type = "group-invite", targetKind = "group", targetId = roomId });
+        await hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("NotificationReceived", new { type = "group-invite", title = room.Name, body = $"{inviter} invited you to join", targetKind = "group", targetId = roomId });
         return Ok();
     }
 
@@ -116,7 +116,7 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
         await db.SaveChangesAsync();
         var payload = new { row.Id, row.GroupRoomId, row.SenderId, senderName = name, row.Content, row.SentAt };
         await hub.Clients.Group(ChatHub.RoomGroup(roomId)).SendAsync("GroupMessageReceived", payload);
-        await Task.WhenAll(recipients.Select(userId => hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("NotificationReceived", new { type = "group-message", targetKind = "group", targetId = roomId })));
+        await Task.WhenAll(recipients.Select(userId => hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("NotificationReceived", new { type = "group-message", title = roomName, body = $"{name}: {content}", targetKind = "group", targetId = roomId })));
         return Ok(payload);
     }
 

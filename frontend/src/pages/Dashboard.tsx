@@ -11,7 +11,6 @@ import "./social.css";
 type Person = {
   id: number;
   name: string;
-  email: string;
   bio: string;
   status: string;
   online: boolean;
@@ -61,6 +60,8 @@ export default function Dashboard() {
     [people, setPeople] = useState<Person[]>([]),
     [selected, setSelected] = useState<Person | null>(null),
     [messages, setMessages] = useState<Message[]>([]),
+    [profilePerson, setProfilePerson] = useState<Person | null>(null),
+    [liveToast, setLiveToast] = useState<{ title: string; body: string; type: string } | null>(null),
     [messageDetails, setMessageDetails] = useState<Message | null>(null),
     [replyingTo, setReplyingTo] = useState<Message | null>(null),
     [isTyping, setIsTyping] = useState(false),
@@ -94,8 +95,7 @@ export default function Dashboard() {
     ),
     [pointerEffect, setPointerEffect] = useState(
       () => localStorage.getItem("woven-pointer-effect") || "default",
-    ),
-    [friendshipStreak] = useState(updateActivityStreak);
+    );
   const selectedId = selected?.id;
   const refresh = useCallback(async () => {
     try {
@@ -168,6 +168,11 @@ export default function Dashboard() {
   useEffect(() => localStorage.setItem("woven-theme", theme), [theme]);
   useEffect(() => localStorage.setItem("woven-dark", darkMode ? "on" : "off"), [darkMode]);
   useEffect(() => localStorage.setItem("woven-chat-bg", chatBg), [chatBg]);
+  useEffect(() => {
+    if (!liveToast) return;
+    const timer = window.setTimeout(() => setLiveToast(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [liveToast]);
   useEffect(() => {
     localStorage.setItem("woven-pointer-effect", pointerEffect);
     if (pointerEffect === "default" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -275,8 +280,9 @@ export default function Dashboard() {
     c.on("FriendRequestUpdated", refresh);
     c.on("GroupInviteReceived", refreshGroups);
     c.on("GroupMembershipChanged", () => { refreshGroups(); refreshRecent(); });
-    c.on("NotificationReceived", (item: { title?: string; body?: string }) => {
+    c.on("NotificationReceived", (item: { title?: string; body?: string; type?: string }) => {
       refreshNotifications();
+      setLiveToast({ title: item.title || "Woven", body: item.body || "You have a new notification.", type: item.type || "activity" });
       if (desktopNotifications && "Notification" in window && window.Notification.permission === "granted" && document.hidden) new window.Notification(item.title || "Woven", { body: item.body || "You have a new notification." });
     });
     c.start().then(() => { chatHubRef.current = c; }).catch(() => {});
@@ -330,6 +336,30 @@ export default function Dashboard() {
     deleteReadNotifications = async () => {
       await apiRequest("/api/notifications/read", { method: "DELETE" });
       setNotifications((items) => items.filter((x) => !x.isRead));
+    },
+    removeFriend = async (person: Person) => {
+      if (!window.confirm(`Remove ${person.name} from your friends?`)) return;
+      await apiRequest(`/api/social/friends/${person.id}`, { method: "DELETE" });
+      setProfilePerson(null);
+      if (selected?.id === person.id) { setSelected(null); setView("home"); }
+      await refresh();
+    },
+    requestFromProfile = async (person: Person) => {
+      await add(person);
+      setProfilePerson((current) => current ? { ...current, friendshipStatus: "pending", incoming: false } : current);
+    },
+    cancelRequestFromProfile = async (person: Person) => {
+      await apiRequest(`/api/social/friends/${person.id}`, { method: "DELETE" });
+      setProfilePerson((current) => current ? { ...current, friendshipStatus: undefined, incoming: false } : current);
+      await refresh();
+    },
+    acceptFromProfile = async (person: Person) => {
+      await acceptFriend(person);
+      setProfilePerson((current) => current ? { ...current, friendshipStatus: "accepted", incoming: false } : current);
+    },
+    declineFromProfile = async (person: Person) => {
+      await declineFriend(person);
+      setProfilePerson(null);
     },
     changeStatus = async (status: string) => {
       const result = await apiRequest<{ status: string }>("/api/social/status", { method: "PUT", body: JSON.stringify({ status }) });
@@ -517,6 +547,7 @@ export default function Dashboard() {
     };
   return (
     <div className={`woven-app theme-${theme} ${darkMode ? "dark" : ""}`}>
+      {liveToast && <button className="live-notification-toast" onClick={() => setLiveToast(null)}><span>{liveToast.type.includes("group") ? "👥" : liveToast.type.includes("friend") ? "👤" : "💬"}</span><strong>{liveToast.title}</strong><small>{liveToast.body}</small></button>}
       <aside className="app-sidebar">
         <button className="app-logo" onClick={() => setView("home")}>
           W
@@ -628,25 +659,25 @@ export default function Dashboard() {
             <Avatar name={me.name} avatarUrl={me.avatarUrl} />
             {notice && (
               <div className="notice-pop">
-                <div className="notice-heading"><strong>Requests</strong><div>{notificationCount > 0 && <button onClick={readAllNotifications}>Mark all read</button>}{notifications.some((item) => item.isRead) && <button onClick={deleteReadNotifications}>Delete read</button>}</div></div>
+                <div className="notice-heading"><strong>Notifications</strong><div>{notificationCount > 0 && <button onClick={readAllNotifications}>Mark all read</button>}{notifications.some((item) => item.isRead) && <button onClick={deleteReadNotifications}>Delete read</button>}</div></div>
                 {incomingRequests.map((x) => (
                   <div className="friend-notice" key={`friend-${x.id}`}>
                     <Avatar name={x.name} avatarUrl={x.avatarUrl} />
-                    <span><strong>{x.name}</strong><small>wants to be your friend</small></span>
+                    <span><small>Friend request</small><strong>{x.name} sent you a friend request</strong></span>
                     <div><button onClick={() => acceptFriend(x)}>Accept</button><button className="decline" onClick={() => declineFriend(x)}>Decline</button></div>
                   </div>
                 ))}
                 {pendingGroups.map((room) => (
                   <div className="friend-notice group-invite-notice" key={`group-${room.id}`}>
-                    <div className="avatar">👥</div><span><strong>{room.name}</strong><small>{room.invitedBy} invited you to join</small></span>
+                    <div className="avatar">👥</div><span><small>Group invitation</small><strong>{room.invitedBy} invited you to join {room.name}</strong></span>
                     <div><button onClick={() => acceptGroup(room)}>Accept</button><button className="decline" onClick={() => declineGroup(room)}>Decline</button></div>
                   </div>
                 ))}
                 {!incomingRequests.length && !pendingGroups.length && (
                   <div className="notification-empty">
-                    <strong>No pending requests</strong>
-                    <span>Friend requests and group invitations will appear here.</span>
-                    <small>👤 Friend requests</small><small>👥 Group invitations</small>
+                    <i>✓</i>
+                    <strong>You're all caught up</strong>
+                    <span>Nothing new right now. New friend requests and group invitations will show up here.</span>
                   </div>
                 )}
               </div>
@@ -667,9 +698,6 @@ export default function Dashboard() {
                   {friends.filter((x) => x.online).length} friends online ·{" "}
                   {unread} unread messages
                 </p>
-              </div>
-              <div className="welcome-streak">
-                <div className="friendship-streak"><span>🔥</span><strong>{friendshipStreak} day{friendshipStreak === 1 ? "" : "s"}</strong><small>Friendship streak</small></div>
               </div>
             </div>
             <div className="quick-section">
@@ -722,7 +750,7 @@ export default function Dashboard() {
             }
           >
             <div className="chat-meta">
-              <Avatar name={selected.name} avatarUrl={selected.avatarUrl} />
+              <button className="profile-avatar-button" aria-label={`View ${selected.name} profile`} onClick={() => setProfilePerson(selected)}><Avatar name={selected.name} avatarUrl={selected.avatarUrl} /></button>
               <span>
                 <strong>{selected.name}</strong>
                 <small>
@@ -937,6 +965,24 @@ export default function Dashboard() {
             </div>
           </section>
         )}
+        {profilePerson && (
+          <div className="person-profile-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setProfilePerson(null)}>
+            <section className="person-profile-card">
+              <button className="person-profile-close" aria-label="Close profile" onClick={() => setProfilePerson(null)}>×</button>
+              <Avatar name={profilePerson.name} avatarUrl={profilePerson.avatarUrl} />
+              <h3>{profilePerson.name}</h3>
+              <span className="person-profile-status"><i className={profilePerson.online ? "online-dot" : "offline-dot"} />{profilePerson.online ? "Online" : profilePerson.status}</span>
+              <p>{profilePerson.bio || "No description yet."}</p>
+              <div className="person-profile-actions">
+                <button onClick={() => setProfilePerson(null)}>Cancel</button>
+                {profilePerson.friendshipStatus === "accepted" && <button className="danger" onClick={() => removeFriend(profilePerson)}>Remove friend</button>}
+                {!profilePerson.friendshipStatus && <button className="primary-action" onClick={() => requestFromProfile(profilePerson)}>Add friend</button>}
+                {profilePerson.friendshipStatus === "pending" && !profilePerson.incoming && <button className="danger-outline" onClick={() => cancelRequestFromProfile(profilePerson)}>Cancel request</button>}
+                {profilePerson.friendshipStatus === "pending" && profilePerson.incoming && <><button className="danger-outline" onClick={() => declineFromProfile(profilePerson)}>Decline</button><button className="primary-action" onClick={() => acceptFromProfile(profilePerson)}>Accept</button></>}
+              </div>
+            </section>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -968,21 +1014,6 @@ function chatDateLabel(date: Date) {
 
 function formatMessageDateTime(value: string) {
   return new Date(value).toLocaleString([], { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
-function updateActivityStreak() {
-  const today = new Date(),
-    key = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`,
-    lastKey = localStorage.getItem("woven-streak-day"),
-    previous = Number(localStorage.getItem("woven-friendship-streak") || "0");
-  if (lastKey === key) return Math.max(previous, 1);
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  const yesterdayKey = `${yesterday.getFullYear()}-${yesterday.getMonth() + 1}-${yesterday.getDate()}`,
-    next = lastKey === yesterdayKey ? previous + 1 : 1;
-  localStorage.setItem("woven-streak-day", key);
-  localStorage.setItem("woven-friendship-streak", String(next));
-  return next;
 }
 
 function MessageAttachment({ message }: { message: Message }) {

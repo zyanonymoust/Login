@@ -542,6 +542,10 @@
 }
 .header-tools > .avatar { display: grid; place-items: center; text-align: center; }
 .notification-trigger { display: grid; place-items: center; font-size: 18px; line-height: 1; }
+.live-notification-toast { position: fixed; z-index: 1300; top: 20px; right: 20px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; width: min(360px, calc(100vw - 40px)); padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); background: var(--panel); box-shadow: 0 18px 48px #17132933; text-align: left; cursor: pointer; }
+.live-notification-toast > span { grid-row: 1 / 3; align-self: center; font-size: 24px; }
+.live-notification-toast strong, .live-notification-toast small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-notification-toast small { color: var(--muted); }
 .notice-pop {
   position: absolute;
   right: 0;
@@ -575,13 +579,14 @@
 .notification-item .notification-kind { color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .notification-item.unread { border-left: 3px solid var(--accent); }
 .notification-item.read { opacity: .7; }
-.notification-empty { display: flex; flex-direction: column; gap: 7px; padding: 14px 4px 3px; color: var(--muted); }
-.notification-empty strong { color: var(--ink); }
-.notification-empty > span { margin-bottom: 5px; font-size: 11px; line-height: 1.45; }
-.notification-empty small { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+.notification-empty { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 28px 14px 20px; color: var(--muted); text-align: center; }
+.notification-empty > i { display: grid; width: 44px; height: 44px; place-items: center; margin-bottom: 3px; border-radius: 50%; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--soft)); font-size: 20px; font-style: normal; font-weight: 900; }
+.notification-empty strong { color: var(--ink); font-size: 16px; }
+.notification-empty > span { max-width: 270px; font-size: 11px; line-height: 1.55; }
 .friend-notice { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; margin-top: 10px; padding: 10px; border-radius: 11px; background: var(--soft); }
 .friend-notice > span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-.friend-notice small { color: var(--muted); }
+.friend-notice small { color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.friend-notice strong { font-size: 12px; line-height: 1.4; }
 .friend-notice > div { grid-column: 1 / -1; display: flex; gap: 7px; }
 .friend-notice button { margin: 0; color: white; background: var(--accent); text-align: center; }
 .friend-notice button.decline, .friend-tip button.decline { color: var(--ink); background: transparent; border: 1px solid var(--line); }
@@ -696,6 +701,20 @@
   border-bottom: 1px solid var(--line);
   background: white;
 }
+.profile-avatar-button { display: grid; flex: none; place-items: center; padding: 0; border: 0; border-radius: 13px; background: transparent; cursor: pointer; }
+.person-profile-backdrop { position: fixed; z-index: 1250; inset: 0; display: grid; place-items: center; padding: 20px; background: #090b16aa; backdrop-filter: blur(8px); }
+.person-profile-card { position: relative; display: flex; width: min(390px, 100%); flex-direction: column; align-items: center; padding: 30px; border: 1px solid var(--line); border-radius: 20px; color: var(--ink); background: var(--panel); box-shadow: 0 24px 70px #0005; }
+.person-profile-card > .avatar { width: 72px; height: 72px; font-size: 24px; }
+.person-profile-card h3 { margin: 14px 0 5px; font: 800 24px Manrope; }
+.person-profile-card > p { width: 100%; margin: 20px 0 10px; padding: 14px; border-radius: 12px; background: var(--soft); line-height: 1.55; text-align: center; }
+.person-profile-card > small { color: var(--muted); }
+.person-profile-status { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+.person-profile-close { position: absolute; top: 12px; right: 14px; border: 0; color: var(--muted); background: transparent; font-size: 25px; cursor: pointer; }
+.person-profile-actions { display: flex; width: 100%; gap: 10px; margin-top: 22px; }
+.person-profile-actions button { min-height: 42px; flex: 1; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--soft); font-weight: 750; cursor: pointer; }
+.person-profile-actions button.danger { color: white; border-color: #e25462; background: #e25462; }
+.person-profile-actions button.primary-action { color: white; border-color: var(--accent); background: var(--accent); }
+.person-profile-actions button.danger-outline { color: #d84c5a; border-color: #e2546277; background: transparent; }
 .chat-search { width: min(260px, 38%); display: flex; align-items: center; gap: 7px; margin-left: auto; padding: 8px 11px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--soft); }
 .chat-search input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--ink); background: transparent; }
 .conversation-mute { width: 38px; height: 38px; flex: none; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--soft); cursor: pointer; }

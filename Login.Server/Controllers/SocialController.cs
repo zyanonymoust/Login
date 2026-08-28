@@ -23,7 +23,7 @@ public class SocialController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
         return Ok(users.Select(u => {
             var link = links.FirstOrDefault(x => x.RequesterId == u.Id || x.AddresseeId == u.Id);
             var invisible = u.Status == "Invisible";
-            return new { u.Id, u.Name, u.Email, u.Bio, avatarUrl = u.AvatarData != null ? $"/api/social/avatar/{u.Id}" : null, status = invisible ? "Offline" : u.Status, online = !invisible && u.LastSeenAt > DateTime.UtcNow.AddMinutes(-2), friendshipStatus = link?.Status, incoming = link?.AddresseeId == me, unread = db.Messages.Count(m => m.SenderId == u.Id && m.RecipientId == me && m.ReadAt == null) };
+            return new { u.Id, u.Name, u.Bio, avatarUrl = u.AvatarData != null ? $"/api/social/avatar/{u.Id}" : null, status = invisible ? "Offline" : u.Status, online = !invisible && u.LastSeenAt > DateTime.UtcNow.AddMinutes(-2), friendshipStatus = link?.Status, incoming = link?.AddresseeId == me, unread = db.Messages.Count(m => m.SenderId == u.Id && m.RecipientId == me && m.ReadAt == null) };
         }));
     }
 
@@ -42,7 +42,7 @@ public class SocialController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
             db.Notifications.Add(new Notification { UserId = otherId, Type = "friend-request", Title = senderName, Body = "sent you a friend request", TargetKind = "person", TargetId = UserId });
             await db.SaveChangesAsync();
             await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("FriendRequestReceived", new { fromUserId = UserId });
-            await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "friend-request", targetKind = "person", targetId = UserId });
+            await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "friend-request", title = senderName, body = "sent you a friend request", targetKind = "person", targetId = UserId });
         }
         else if (existing.AddresseeId == UserId)
         {
@@ -70,10 +70,10 @@ public class SocialController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     [HttpDelete("friends/{otherId:int}")]
     public async Task<IActionResult> DeclineFriend(int otherId)
     {
-        var request = await db.Friendships.FirstOrDefaultAsync(x => x.RequesterId == otherId && x.AddresseeId == UserId && x.Status == "pending");
-        if (request is null) return NotFound(new { message = "Friend request not found." });
+        var request = await db.Friendships.FirstOrDefaultAsync(x => (x.RequesterId == UserId && x.AddresseeId == otherId) || (x.RequesterId == otherId && x.AddresseeId == UserId));
+        if (request is null) return NotFound(new { message = "Friendship not found." });
         db.Friendships.Remove(request); await db.SaveChangesAsync();
-        await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("FriendRequestUpdated", new { userId = UserId, status = "declined" });
+        await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("FriendRequestUpdated", new { userId = UserId, status = "removed" });
         return NoContent();
     }
 

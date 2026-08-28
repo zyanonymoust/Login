@@ -79,7 +79,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
         await db.SaveChangesAsync();
         var payload = new { row.Id, row.SenderId, row.RecipientId, row.Content, row.SentAt, row.ReadAt, row.AttachmentName, row.AttachmentContentType, attachmentUrl = (string?)null, replyTo, reactions = Array.Empty<object>(), request.ClientMessageId };
         await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("MessageReceived", payload);
-        if (!muted) await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "message", targetKind = "person", targetId = UserId });
+        if (!muted) await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "message", title = senderName, body = content, targetKind = "person", targetId = UserId });
         await hub.Clients.Group(ChatHub.UserGroup(UserId)).SendAsync("MessageSent", payload);
         return Ok(payload);
     }
@@ -172,7 +172,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
         await db.SaveChangesAsync();
         var payload = new { row.Id, row.SenderId, row.RecipientId, row.Content, row.SentAt, row.ReadAt, row.AttachmentName, row.AttachmentContentType, attachmentUrl = $"/api/messages/attachment/{row.Id}" };
         await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("MessageReceived", payload);
-        if (!muted) await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "message", targetKind = "person", targetId = UserId });
+        if (!muted) await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("NotificationReceived", new { type = "message", title = senderName, body = safeCaption.Length > 0 ? safeCaption : $"Sent {safeName}", targetKind = "person", targetId = UserId });
         await hub.Clients.Group(ChatHub.UserGroup(UserId)).SendAsync("MessageSent", payload);
         return Ok(payload);
     }
