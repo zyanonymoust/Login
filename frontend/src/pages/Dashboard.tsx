@@ -626,23 +626,18 @@ export default function Dashboard() {
             ⌂<span>Home</span>
           </button>
           <button
-            aria-label="Messages"
-            className={view === "chat" ? "active" : ""}
+            aria-label="Public Channel"
+            className={view === "world" ? "active" : ""}
             onClick={() => {
-              setView("chat");
-              if (window.matchMedia("(max-width: 900px)").matches) {
-                setMobilePeopleOpen(true);
-              }
+              setMobilePeopleOpen(false);
+              setView("world");
             }}
           >
-            💬<span>Messages</span>
+            🌍<span>Public chat</span>
             {unread > 0 && <b>{unread}</b>}
           </button>
           <button aria-label="Groups" className={view === "groups" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}>
             👥<span>Groups</span>{pendingGroups.length > 0 && <b>{pendingGroups.length}</b>}
-          </button>
-          <button aria-label="World Chat" className={view === "world" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("world"); }}>
-            🌍<span>World</span>
           </button>
         </nav>
         <div className="side-bottom">
@@ -669,7 +664,7 @@ export default function Dashboard() {
       <section className={`people-panel ${mobilePeopleOpen ? "mobile-open" : ""}`}>
         <div className="panel-title">
           <h2>Woven</h2>
-          <button onClick={() => setView("profile")}>＋</button>
+          <button className="panel-profile-button" aria-label="Open your profile" title="Your profile" onClick={() => { setMobilePeopleOpen(false); setView("profile"); }}>👤</button>
         </div>
         <label className="search">
           ⌕{" "}
@@ -681,7 +676,7 @@ export default function Dashboard() {
         </label>
         <div className="people-scroll">
           <div className="chat-space-links">
-            <button onClick={() => { setMobilePeopleOpen(false); setView("world"); }}><span>🌍</span><b>World Chat</b><small>Public messages for everyone</small></button>
+            <button className="public-channel-link" onClick={() => { setMobilePeopleOpen(false); setView("world"); }}><span>🌍</span><b>Public Channel</b><small>Everyone can talk here</small></button>
             <button onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}><span>👥</span><b>Group Chat</b><small>Your groups and invitations</small></button>
           </div>
           <Group
@@ -730,7 +725,7 @@ export default function Dashboard() {
                     : view === "groups"
                       ? "Groups"
                     : view === "world"
-                      ? "World Chat"
+                      ? "Public Channel"
                     : "Good day, " + (me.name?.split(" ")[0] || "friend")}
             </h2>
           </div>
@@ -771,9 +766,9 @@ export default function Dashboard() {
           </div>
         </header>
         {(view === "chat" || view === "groups" || view === "world") && <nav className="chat-mode-tabs" aria-label="Chat sections">
-          <button className={view === "chat" ? "active" : ""} onClick={() => { setView("chat"); if (window.matchMedia("(max-width: 900px)").matches && !selected) setMobilePeopleOpen(true); }}>💬 Messages</button>
+          <button className={view === "chat" ? "active" : ""} onClick={() => { const person = selected || friends[0] || others[0]; if (person) choose(person); else { setView("chat"); setMobilePeopleOpen(true); } }}>💬 Messages</button>
           <button className={view === "groups" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}>👥 Group Chat</button>
-          <button className={view === "world" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("world"); }}>🌍 World Chat</button>
+          <button className={view === "world" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("world"); }}>🌍 Public Channel</button>
         </nav>}
         {view === "home" && (
           <section className="home-view">
@@ -831,7 +826,7 @@ export default function Dashboard() {
         )}
         {view === "groups" && <GroupSpace rooms={groupRooms} people={people} me={me} initialRoomId={selectedGroupId} onRoomsChanged={refreshGroups} onRoomRead={handleRoomRead} />}
         {view === "world" && <WorldChat me={me} />}
-        {view === "chat" && !selected && <section className="chat-hub-empty"><div>💬</div><h3>Your messages</h3><p>Choose a friend or Public user from the list, or open World Chat to talk with everyone.</p><button onClick={() => setView("world")}>🌍 Open World Chat</button></section>}
+        {view === "chat" && !selected && <section className="chat-hub-empty"><div>💬</div><h3>No user available to chat</h3><p>Public users will appear here when another account is registered. The Public Channel is always available.</p><button onClick={() => setView("world")}>🌍 Open Public Channel</button></section>}
         {view === "chat" && selected && (
           <section
             className={`chat-view bg-${chatBg.startsWith("data:") ? "custom" : chatBg}`}
@@ -1132,7 +1127,7 @@ function BoredomBreak() {
   const [bestReaction, setBestReaction] = useState<number | null>(null);
   const [secret, setSecret] = useState(() => Math.floor(Math.random() * 100) + 1);
   const [guess, setGuess] = useState("");
-  const [guessHint, setGuessHint] = useState("Enter a number from 1 to 100.");
+  const [guessHint, setGuessHint] = useState("");
   const [attempts, setAttempts] = useState(0);
   const [guessCompleted, setGuessCompleted] = useState(false);
 
@@ -1186,7 +1181,7 @@ function BoredomBreak() {
     setGuess("");
     setAttempts(0);
     setGuessCompleted(false);
-    setGuessHint("A new number has been generated.");
+    setGuessHint("");
   };
 
   return (
@@ -1201,7 +1196,7 @@ function BoredomBreak() {
             <div className="game-heading"><div className="game-icon">🔢</div><div><h3>Guess the Number</h3><p>Find the hidden number from 1 to 100.</p></div></div>
             <div className="guess-range"><span>1</span><div className="range-line"/><span>100</span></div>
             <div className="game-input-row"><input type="number" min="1" max="100" value={guess} disabled={guessCompleted} placeholder="Your guess" onChange={(event) => setGuess(event.target.value)} onKeyDown={(event) => event.key === "Enter" && !guessCompleted && checkGuess()} /><button onMouseDown={(event) => event.preventDefault()} onClick={guessCompleted ? resetGuess : checkGuess}>{guessCompleted ? "New Game" : "Guess"}</button></div>
-            <div className={guessCompleted ? "game-message success" : "game-message"}><p>{guessHint}</p><span>Attempts: {attempts}</span></div>
+            {(guessHint || attempts > 0) && <div className={guessCompleted ? "game-message success" : "game-message"}><p>{guessHint}</p>{attempts > 0 && <span>{attempts} {attempts === 1 ? "guess" : "guesses"}</span>}</div>}
           </article>
           <article className="reaction-card classic-reaction-card">
           <div className="game-heading"><div className="game-icon">⚡</div><div><h3>Reaction Speed</h3><p>Click when the colour changes.</p></div></div>

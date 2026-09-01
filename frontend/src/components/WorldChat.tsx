@@ -22,7 +22,7 @@ const emojis = ["👍", "❤️", "😂", "😮", "😢", "🎉"];
 export default function WorldChat({ me }: Props) {
   const myId = me.id || me.userId || 0;
   const [state, setState] = useState<WorldState>({ channels: Object.keys(channelLabels), announcement: "", slowModeSeconds: 5, onlineCount: 0, blockedIds: [] });
-  const [channel, setChannel] = useState("general");
+  const channel = "general";
   const [messages, setMessages] = useState<WorldMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [reply, setReply] = useState<WorldMessage | null>(null);
@@ -130,14 +130,14 @@ export default function WorldChat({ me }: Props) {
   };
 
   return <section className="world-chat">
-    <header className="world-header"><div><span className={connected ? "world-live" : "world-offline"} /> <strong>World Chat</strong><small>{state.onlineCount} 人在线 · 慢速模式 {state.slowModeSeconds}s</small></div>{adminEnabled && <button onClick={openAdmin}>🛡 管理</button>}</header>
-    <nav className="world-channels">{state.channels.map((item) => <button key={item} className={item === channel ? "active" : ""} onClick={() => setChannel(item)}>{channelLabels[item] || item}</button>)}</nav>
+    <header className="world-header"><div><span className={connected ? "world-live" : "world-offline"} /> <strong>Public Channel</strong><small>{state.onlineCount} online · everyone can join</small></div>{adminEnabled && <button onClick={openAdmin}>🛡 Manage</button>}</header>
     {state.announcement && <div className="world-announcement"><b>📢 公告</b><span>{state.announcement}</span>{me.isAdmin && <button onClick={saveSettings}>编辑</button>}</div>}
     {state.muteReason && <div className="world-muted">🔇 你目前无法发言：{state.muteReason}</div>}
     {error && <div className="world-error">{error}<button onClick={() => setError("")}>×</button></div>}
     {adminOpen && <aside className="world-admin"><header><strong>管理员中心</strong><button onClick={saveSettings}>公告与慢速模式</button></header>{(myId === 1 || myId === 2) && <section className="world-permissions"><h4>用户权限与密码</h4>{adminUsers.map((user) => <div key={user.id}><span><b>{user.name}</b><small>#{user.id} · {user.isOwner ? "Owner" : user.isAdmin ? "Admin" : "Member"}{user.mustChangePassword ? " · 等待修改密码" : ""}</small></span>{user.isOwner ? <em>永久 Owner</em> : <div className="world-user-actions"><button onClick={() => setAdminPermission(user)}>{user.isAdmin ? "取消管理员" : "设为管理员"}</button><button onClick={() => resetPassword(user)}>重置密码</button></div>}</div>)}</section>}<h4>举报审核</h4>{reports.length === 0 ? <p>目前没有举报。</p> : reports.map((item) => <article key={item.id}><div><b>{item.reportedName}</b><span>{item.reason} · 举报人 {item.reporterName}</span><small>{item.details || "没有补充说明"}</small></div><em>{item.status}</em>{item.status === "open" && <div><button onClick={() => review(item, "resolved")}>处理完成</button><button onClick={() => review(item, "dismissed")}>忽略</button></div>}</article>)}</aside>}
     <div className="world-message-list" ref={listRef} onScroll={(event) => { const element = event.currentTarget; pinnedRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 30; if (element.scrollTop < 60) void loadOlder(); }}>
       {hasOlder && <button className="world-load-older" onClick={loadOlder} disabled={loadingOlder}>{loadingOlder ? "读取中…" : "读取更早信息"}</button>}
+      {!messages.length && <div className="world-empty"><span>🌍</span><strong>Start the public conversation</strong><p>Every signed-in Woven user can read and reply here.</p></div>}
       {messages.map((message) => <article className={`world-message ${message.senderId === myId ? "mine" : ""}`} key={message.id}>
         <div className="world-avatar">{message.senderAvatarUrl ? <img src={`${API_BASE_URL}${message.senderAvatarUrl}`} alt="" /> : message.senderName.charAt(0).toUpperCase()}</div>
         <div className="world-message-body"><header><strong>{message.senderName}</strong>{message.isAdmin && <b>ADMIN</b>}<time>{new Date(message.sentAt).toLocaleString()}</time></header>{message.replyTo && <div className="world-reply"><b>{message.replyTo.senderName}</b>{message.replyTo.content}</div>}<p>{message.content}</p>{message.attachmentUrl && <WorldAttachment message={message} />}
@@ -146,7 +146,7 @@ export default function WorldChat({ me }: Props) {
         </div>
       </article>)}
     </div>
-    <div className="world-composer">{reply && <div className="world-replying"><span>回复 {reply.senderName}：{reply.content}</span><button onClick={() => setReply(null)}>×</button></div>}<button onClick={() => fileRef.current?.click()} disabled={sending}>＋</button><input ref={fileRef} hidden type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(event) => void upload(event.target.files?.[0])} /><textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder={`在 ${channelLabels[channel]} 发言…`} maxLength={2000} disabled={!!state.muteReason} /><button onClick={send} disabled={sending || !draft.trim()}>↑</button></div>
+    <div className="world-composer">{reply && <div className="world-replying"><span>Reply to {reply.senderName}: {reply.content}</span><button onClick={() => setReply(null)}>×</button></div>}<button onClick={() => fileRef.current?.click()} disabled={sending}>＋</button><input ref={fileRef} hidden type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(event) => void upload(event.target.files?.[0])} /><textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="Message everyone…" maxLength={2000} disabled={!!state.muteReason} /><button onClick={send} disabled={sending || !draft.trim()} aria-label="Send public message">↑</button></div>
   </section>;
 }
 

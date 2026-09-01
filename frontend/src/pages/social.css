@@ -374,6 +374,7 @@
   width: 36px;
   height: 36px;
 }
+.panel-title .panel-profile-button { display: grid; place-items: center; font-size: 16px; cursor: pointer; }
 .search {
   display: flex;
   gap: 8px;
@@ -401,16 +402,17 @@
 .chat-space-links { display: grid; gap: 7px; margin: 0 0 14px; }
 .chat-space-links button { width: 100%; padding: 10px 12px; display: grid; grid-template-columns: 34px 1fr; column-gap: 9px; align-items: center; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--soft); text-align: left; cursor: pointer; }
 .chat-space-links button span { grid-row: 1 / 3; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: color-mix(in srgb, var(--accent) 12%, var(--paper)); }
-.chat-space-links button b { font-size: 12px; }
-.chat-space-links button small { color: var(--muted); font-size: 9px; }
+.chat-space-links button b { font-size: 14px; }
+.chat-space-links button small { color: var(--muted); font-size: 11px; }
 .chat-space-links button:hover { border-color: var(--accent); }
+.chat-space-links .public-channel-link { min-height: 62px; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 15%, var(--soft)), var(--soft)); }
 .chat-hub-empty { height: calc(100vh - 86px); padding: 28px; display: grid; place-content: center; justify-items: center; text-align: center; color: var(--muted); }
 .chat-hub-empty > div { width: 68px; height: 68px; display: grid; place-items: center; border-radius: 20px; background: var(--soft); font-size: 30px; }
 .chat-hub-empty h3 { margin: 18px 0 5px; color: var(--ink); }
 .chat-hub-empty p { max-width: 410px; margin: 0 0 18px; }
 .chat-hub-empty button { padding: 11px 16px; border: 0; border-radius: 11px; color: white; background: var(--accent); font-weight: 800; cursor: pointer; }
 .chat-mode-tabs { min-height: 48px; padding: 7px 14px; display: flex; gap: 7px; align-items: center; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--paper); }
-.chat-mode-tabs button { flex: 0 0 auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--soft); font-weight: 750; cursor: pointer; }
+.chat-mode-tabs button { flex: 0 0 auto; padding: 9px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--soft); font-size: 14px; font-weight: 750; cursor: pointer; }
 .chat-mode-tabs button.active { color: white; border-color: var(--accent); background: var(--accent); }
 .app-main:has(.chat-mode-tabs) .chat-view, .app-main:has(.chat-mode-tabs) .group-space, .app-main:has(.chat-mode-tabs) .world-chat, .app-main:has(.chat-mode-tabs) .chat-hub-empty { height: calc(100vh - 134px); }
 .woven-app.dark .chat-mode-tabs { background: #101527; }
@@ -1103,12 +1105,14 @@
 .range-line { flex: 1; height: 7px; border-radius: 10px; background: linear-gradient(90deg, #7b68ee, #49b7ff, #53d69d); }
 .game-input-row { display: grid; grid-template-columns: minmax(0, 1fr) 88px; gap: 14px; align-items: center; }
 .game-input-row input { width: 100%; min-width: 0; height: 50px; box-sizing: border-box; padding: 0 16px; border: 1px solid var(--line); border-radius: 13px; color: var(--ink); background: var(--soft); outline: none; }
+.game-input-row input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+.game-input-row input[type="number"]::-webkit-inner-spin-button, .game-input-row input[type="number"]::-webkit-outer-spin-button { margin: 0; appearance: none; -webkit-appearance: none; }
 .game-input-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 13%, transparent); }
 .game-input-row button { min-height: 46px; padding: 0 16px; border: 0; border-radius: 11px; color: white; background: var(--accent); box-shadow: 0 7px 18px color-mix(in srgb, var(--accent) 22%, transparent); font-size: 13px; font-weight: 800; white-space: nowrap; }
-.game-message { height: 135px; min-height: 135px; box-sizing: border-box; margin-top: 22px; padding: 17px; border-radius: 15px; background: var(--soft); }
-.game-message.success { background: #34c77a21; }
-.game-message p { margin: 0 0 10px; font-weight: 700; }
-.game-message span { color: var(--muted); font-size: 13px; }
+.game-message { min-height: 0; box-sizing: border-box; margin-top: 16px; padding: 11px 13px; display: flex; align-items: center; gap: 12px; border-left: 4px solid var(--accent); border-radius: 9px; background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.game-message.success { border-left-color: #34c77a; background: #34c77a18; }
+.game-message p { flex: 1; margin: 0; font-weight: 700; }
+.game-message span { flex: none; padding: 4px 8px; border-radius: 999px; color: var(--muted); background: var(--soft); font-size: 11px; }
 .reaction-score { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 30px 0 20px; }
 .reaction-score div { display: flex; flex-direction: column; gap: 7px; padding: 16px; border-radius: 15px; background: var(--soft); }
 .reaction-score span { color: var(--muted); font-size: 12px; text-transform: uppercase; }
@@ -1308,7 +1312,7 @@
   .header-tools { margin-left: auto; }
   .chat-view { height: calc(100dvh - 136px); min-height: 0; }
   .chat-mode-tabs { min-height: 46px; padding: 6px 8px; }
-  .chat-mode-tabs button { padding: 7px 10px; font-size: 11px; }
+  .chat-mode-tabs button { padding: 8px 11px; font-size: 13px; }
   .app-main:has(.chat-mode-tabs) .chat-view, .app-main:has(.chat-mode-tabs) .group-space, .app-main:has(.chat-mode-tabs) .world-chat, .app-main:has(.chat-mode-tabs) .chat-hub-empty { height: calc(100dvh - 182px); }
   .chat-meta { padding: 10px 12px; flex-wrap: wrap; }
   .chat-search { order: 4; flex-basis: calc(100% - 52px); margin-left: 0; }
@@ -1391,8 +1395,8 @@
   .game-heading p { font-size: 12px; }
   .game-icon { width: 43px; height: 43px; border-radius: 13px; font-size: 20px; }
   .guess-range { margin: 16px 0 13px; }
-  .game-message { height: 90px; min-height: 90px; margin-top: 12px; padding: 11px; font-size: 12px; }
-  .game-message p { margin-bottom: 6px; }
+  .game-message { min-height: 0; margin-top: 10px; padding: 9px 10px; gap: 7px; font-size: 11px; }
+  .game-message p { margin: 0; }
   .reaction-score { margin: 14px 0 12px; }
   .reaction-score div { padding: 11px; }
   .jump-game-card { margin-inline: auto !important; padding: 12px !important; }
