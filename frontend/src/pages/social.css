@@ -398,6 +398,22 @@
   margin-top: 4px;
   padding: 0 4px 10px 0;
 }
+.chat-space-links { display: grid; gap: 7px; margin: 0 0 14px; }
+.chat-space-links button { width: 100%; padding: 10px 12px; display: grid; grid-template-columns: 34px 1fr; column-gap: 9px; align-items: center; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--soft); text-align: left; cursor: pointer; }
+.chat-space-links button span { grid-row: 1 / 3; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: color-mix(in srgb, var(--accent) 12%, var(--paper)); }
+.chat-space-links button b { font-size: 12px; }
+.chat-space-links button small { color: var(--muted); font-size: 9px; }
+.chat-space-links button:hover { border-color: var(--accent); }
+.chat-hub-empty { height: calc(100vh - 86px); padding: 28px; display: grid; place-content: center; justify-items: center; text-align: center; color: var(--muted); }
+.chat-hub-empty > div { width: 68px; height: 68px; display: grid; place-items: center; border-radius: 20px; background: var(--soft); font-size: 30px; }
+.chat-hub-empty h3 { margin: 18px 0 5px; color: var(--ink); }
+.chat-hub-empty p { max-width: 410px; margin: 0 0 18px; }
+.chat-hub-empty button { padding: 11px 16px; border: 0; border-radius: 11px; color: white; background: var(--accent); font-weight: 800; cursor: pointer; }
+.chat-mode-tabs { min-height: 48px; padding: 7px 14px; display: flex; gap: 7px; align-items: center; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--paper); }
+.chat-mode-tabs button { flex: 0 0 auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--soft); font-weight: 750; cursor: pointer; }
+.chat-mode-tabs button.active { color: white; border-color: var(--accent); background: var(--accent); }
+.app-main:has(.chat-mode-tabs) .chat-view, .app-main:has(.chat-mode-tabs) .group-space, .app-main:has(.chat-mode-tabs) .world-chat, .app-main:has(.chat-mode-tabs) .chat-hub-empty { height: calc(100vh - 134px); }
+.woven-app.dark .chat-mode-tabs { background: #101527; }
 .people-group h4 {
   margin: 26px 8px 9px;
   color: var(--muted);
@@ -1291,6 +1307,9 @@
   .app-main > header h2 { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .header-tools { margin-left: auto; }
   .chat-view { height: calc(100dvh - 136px); min-height: 0; }
+  .chat-mode-tabs { min-height: 46px; padding: 6px 8px; }
+  .chat-mode-tabs button { padding: 7px 10px; font-size: 11px; }
+  .app-main:has(.chat-mode-tabs) .chat-view, .app-main:has(.chat-mode-tabs) .group-space, .app-main:has(.chat-mode-tabs) .world-chat, .app-main:has(.chat-mode-tabs) .chat-hub-empty { height: calc(100dvh - 182px); }
   .chat-meta { padding: 10px 12px; flex-wrap: wrap; }
   .chat-search { order: 4; flex-basis: calc(100% - 52px); margin-left: 0; }
   .composer { padding: 10px; }

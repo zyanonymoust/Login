@@ -629,11 +629,10 @@ export default function Dashboard() {
             aria-label="Messages"
             className={view === "chat" ? "active" : ""}
             onClick={() => {
+              setView("chat");
               if (window.matchMedia("(max-width: 900px)").matches) {
                 setMobilePeopleOpen(true);
-                return;
               }
-              if (selected) setView("chat");
             }}
           >
             💬<span>Messages</span>
@@ -681,6 +680,10 @@ export default function Dashboard() {
           />
         </label>
         <div className="people-scroll">
+          <div className="chat-space-links">
+            <button onClick={() => { setMobilePeopleOpen(false); setView("world"); }}><span>🌍</span><b>World Chat</b><small>Public messages for everyone</small></button>
+            <button onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}><span>👥</span><b>Group Chat</b><small>Your groups and invitations</small></button>
+          </div>
           <Group
             title="Friends"
             people={friends.filter((x) =>
@@ -767,6 +770,11 @@ export default function Dashboard() {
             )}
           </div>
         </header>
+        {(view === "chat" || view === "groups" || view === "world") && <nav className="chat-mode-tabs" aria-label="Chat sections">
+          <button className={view === "chat" ? "active" : ""} onClick={() => { setView("chat"); if (window.matchMedia("(max-width: 900px)").matches && !selected) setMobilePeopleOpen(true); }}>💬 Messages</button>
+          <button className={view === "groups" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}>👥 Group Chat</button>
+          <button className={view === "world" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("world"); }}>🌍 World Chat</button>
+        </nav>}
         {view === "home" && (
           <section className="home-view">
             <div className="welcome-block">
@@ -823,6 +831,7 @@ export default function Dashboard() {
         )}
         {view === "groups" && <GroupSpace rooms={groupRooms} people={people} me={me} initialRoomId={selectedGroupId} onRoomsChanged={refreshGroups} onRoomRead={handleRoomRead} />}
         {view === "world" && <WorldChat me={me} />}
+        {view === "chat" && !selected && <section className="chat-hub-empty"><div>💬</div><h3>Your messages</h3><p>Choose a friend or Public user from the list, or open World Chat to talk with everyone.</p><button onClick={() => setView("world")}>🌍 Open World Chat</button></section>}
         {view === "chat" && selected && (
           <section
             className={`chat-view bg-${chatBg.startsWith("data:") ? "custom" : chatBg}`}
