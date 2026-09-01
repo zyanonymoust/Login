@@ -97,6 +97,9 @@ export default function Dashboard() {
     [theme, setTheme] = useState(
       () => localStorage.getItem("woven-theme") || "violet",
     ),
+    [fontSize, setFontSize] = useState<"small" | "default" | "large">(
+      () => (localStorage.getItem("woven-font-size") as "small" | "default" | "large") || "default",
+    ),
     [darkMode, setDarkMode] = useState(
       () => localStorage.getItem("woven-dark") === "on",
     ),
@@ -187,6 +190,7 @@ export default function Dashboard() {
     apiRequest<{ muted: boolean }>(`/api/messages/${selectedId}/preference`).then((result) => setConversationMuted(result.muted)).catch(() => setConversationMuted(false));
   }, [selectedId]);
   useEffect(() => localStorage.setItem("woven-theme", theme), [theme]);
+  useEffect(() => localStorage.setItem("woven-font-size", fontSize), [fontSize]);
   useEffect(() => localStorage.setItem("woven-dark", darkMode ? "on" : "off"), [darkMode]);
   useEffect(() => localStorage.setItem("woven-chat-bg", chatBg), [chatBg]);
   useEffect(() => localStorage.setItem("woven-people-panel", peoplePanelCollapsed ? "collapsed" : "open"), [peoplePanelCollapsed]);
@@ -615,7 +619,7 @@ export default function Dashboard() {
       list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
     };
   return (
-    <div className={`woven-app theme-${theme} ${darkMode ? "dark" : ""} ${peoplePanelCollapsed ? "people-collapsed" : ""}`}>
+    <div className={`woven-app theme-${theme} font-${fontSize} ${darkMode ? "dark" : ""} ${peoplePanelCollapsed ? "people-collapsed" : ""}`}>
       {liveToast && <button className="live-notification-toast" onClick={() => setLiveToast(null)}><span>{liveToast.type.includes("group") ? "👥" : liveToast.type.includes("friend") ? "👤" : "💬"}</span><strong>{liveToast.title}</strong><small>{liveToast.body}</small></button>}
       <aside className="app-sidebar">
         <button className="app-logo" aria-label={peoplePanelCollapsed ? "Open contacts sidebar" : "Close contacts sidebar"} title={peoplePanelCollapsed ? "Open Friends and Public" : "Close Friends and Public"} onClick={() => {
@@ -1019,6 +1023,12 @@ export default function Dashboard() {
             <button className="dark-mode-setting" onClick={toggleDesktopNotifications}>
               <span>🔔</span><div><strong>Notifications</strong><small>Show a notification when Woven is in the background.</small></div><i className={desktopNotifications ? "enabled" : ""} />
             </button>
+            <div className="font-size-setting">
+              <div><h3>Text size</h3><p>Make text smaller or larger across Woven.</p></div>
+              <div className="font-size-options">
+                {(["small", "default", "large"] as const).map((size) => <button type="button" key={size} className={fontSize === size ? "active" : ""} onClick={() => setFontSize(size)}><b>A</b><span>{size === "default" ? "Default" : size.charAt(0).toUpperCase() + size.slice(1)}</span></button>)}
+              </div>
+            </div>
             <div className="background-settings">
               <h3>Chat background</h3>
               <p>Choose a built-in style or use your own image.</p>
