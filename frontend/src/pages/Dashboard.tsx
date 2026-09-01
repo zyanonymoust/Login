@@ -81,6 +81,9 @@ export default function Dashboard() {
     [sending, setSending] = useState(false),
     [showLatestButton, setShowLatestButton] = useState(false),
     [mobilePeopleOpen, setMobilePeopleOpen] = useState(false),
+    [peoplePanelCollapsed, setPeoplePanelCollapsed] = useState(
+      () => localStorage.getItem("woven-people-panel") === "collapsed",
+    ),
     [uploading, setUploading] = useState(false),
     [groupRooms, setGroupRooms] = useState<GroupRoom[]>([]),
     [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]),
@@ -186,6 +189,7 @@ export default function Dashboard() {
   useEffect(() => localStorage.setItem("woven-theme", theme), [theme]);
   useEffect(() => localStorage.setItem("woven-dark", darkMode ? "on" : "off"), [darkMode]);
   useEffect(() => localStorage.setItem("woven-chat-bg", chatBg), [chatBg]);
+  useEffect(() => localStorage.setItem("woven-people-panel", peoplePanelCollapsed ? "collapsed" : "open"), [peoplePanelCollapsed]);
   useEffect(() => {
     if (!liveToast) return;
     const timer = window.setTimeout(() => setLiveToast(null), 5000);
@@ -611,10 +615,13 @@ export default function Dashboard() {
       list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
     };
   return (
-    <div className={`woven-app theme-${theme} ${darkMode ? "dark" : ""}`}>
+    <div className={`woven-app theme-${theme} ${darkMode ? "dark" : ""} ${peoplePanelCollapsed ? "people-collapsed" : ""}`}>
       {liveToast && <button className="live-notification-toast" onClick={() => setLiveToast(null)}><span>{liveToast.type.includes("group") ? "👥" : liveToast.type.includes("friend") ? "👤" : "💬"}</span><strong>{liveToast.title}</strong><small>{liveToast.body}</small></button>}
       <aside className="app-sidebar">
-        <button className="app-logo" onClick={() => setView("home")}>
+        <button className="app-logo" aria-label={peoplePanelCollapsed ? "Open contacts sidebar" : "Close contacts sidebar"} title={peoplePanelCollapsed ? "Open Friends and Public" : "Close Friends and Public"} onClick={() => {
+          if (window.matchMedia("(max-width: 900px)").matches) setMobilePeopleOpen((value) => !value);
+          else setPeoplePanelCollapsed((value) => !value);
+        }}>
           W
         </button>
         <nav>
@@ -626,18 +633,25 @@ export default function Dashboard() {
             ⌂<span>Home</span>
           </button>
           <button
-            aria-label="Public Channel"
-            className={view === "world" ? "active" : ""}
+            aria-label="Messages"
+            className={view === "chat" ? "active" : ""}
             onClick={() => {
-              setMobilePeopleOpen(false);
-              setView("world");
+              const person = selected || friends[0] || others[0];
+              if (person) choose(person);
+              else {
+                setView("chat");
+                setMobilePeopleOpen(true);
+              }
             }}
           >
-            🌍<span>Public chat</span>
+            💬<span>Messages</span>
             {unread > 0 && <b>{unread}</b>}
           </button>
           <button aria-label="Groups" className={view === "groups" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}>
             👥<span>Groups</span>{pendingGroups.length > 0 && <b>{pendingGroups.length}</b>}
+          </button>
+          <button aria-label="Global Channel" className={view === "world" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("world"); }}>
+            🌍<span>Global</span>
           </button>
         </nav>
         <div className="side-bottom">
@@ -664,7 +678,6 @@ export default function Dashboard() {
       <section className={`people-panel ${mobilePeopleOpen ? "mobile-open" : ""}`}>
         <div className="panel-title">
           <h2>Woven</h2>
-          <button className="panel-profile-button" aria-label="Open your profile" title="Your profile" onClick={() => { setMobilePeopleOpen(false); setView("profile"); }}>👤</button>
         </div>
         <label className="search">
           ⌕{" "}
@@ -676,7 +689,7 @@ export default function Dashboard() {
         </label>
         <div className="people-scroll">
           <div className="chat-space-links">
-            <button className="public-channel-link" onClick={() => { setMobilePeopleOpen(false); setView("world"); }}><span>🌍</span><b>Public Channel</b><small>Everyone can talk here</small></button>
+            <button className="public-channel-link" onClick={() => { setMobilePeopleOpen(false); setView("world"); }}><span>🌍</span><b>Global Channel</b><small>Everyone can talk here</small></button>
             <button onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}><span>👥</span><b>Group Chat</b><small>Your groups and invitations</small></button>
           </div>
           <Group
@@ -725,7 +738,7 @@ export default function Dashboard() {
                     : view === "groups"
                       ? "Groups"
                     : view === "world"
-                      ? "Public Channel"
+                      ? "Global Channel"
                     : "Good day, " + (me.name?.split(" ")[0] || "friend")}
             </h2>
           </div>
@@ -768,7 +781,7 @@ export default function Dashboard() {
         {(view === "chat" || view === "groups" || view === "world") && <nav className="chat-mode-tabs" aria-label="Chat sections">
           <button className={view === "chat" ? "active" : ""} onClick={() => { const person = selected || friends[0] || others[0]; if (person) choose(person); else { setView("chat"); setMobilePeopleOpen(true); } }}>💬 Messages</button>
           <button className={view === "groups" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}>👥 Group Chat</button>
-          <button className={view === "world" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("world"); }}>🌍 Public Channel</button>
+          <button className={view === "world" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("world"); }}>🌍 Global Channel</button>
         </nav>}
         {view === "home" && (
           <section className="home-view">
@@ -826,7 +839,7 @@ export default function Dashboard() {
         )}
         {view === "groups" && <GroupSpace rooms={groupRooms} people={people} me={me} initialRoomId={selectedGroupId} onRoomsChanged={refreshGroups} onRoomRead={handleRoomRead} />}
         {view === "world" && <WorldChat me={me} />}
-        {view === "chat" && !selected && <section className="chat-hub-empty"><div>💬</div><h3>No user available to chat</h3><p>Public users will appear here when another account is registered. The Public Channel is always available.</p><button onClick={() => setView("world")}>🌍 Open Public Channel</button></section>}
+        {view === "chat" && !selected && <section className="chat-hub-empty"><div>💬</div><h3>No user available to chat</h3><p>Public users will appear here when another account is registered. The Global Channel is always available.</p><button onClick={() => setView("world")}>🌍 Open Global Channel</button></section>}
         {view === "chat" && selected && (
           <section
             className={`chat-view bg-${chatBg.startsWith("data:") ? "custom" : chatBg}`}

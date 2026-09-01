@@ -130,7 +130,7 @@ export default function WorldChat({ me }: Props) {
   };
 
   return <section className="world-chat">
-    <header className="world-header"><div><span className={connected ? "world-live" : "world-offline"} /> <strong>Public Channel</strong><small>{state.onlineCount} online · everyone can join</small></div>{adminEnabled && <button onClick={openAdmin}>🛡 Manage</button>}</header>
+    <header className="world-header"><div><span className={connected ? "world-live" : "world-offline"} /> <strong>Global Channel</strong><small>{state.onlineCount} online · available to every account</small></div>{adminEnabled && <button onClick={openAdmin}>🛡 Manage</button>}</header>
     {state.announcement && <div className="world-announcement"><b>📢 公告</b><span>{state.announcement}</span>{me.isAdmin && <button onClick={saveSettings}>编辑</button>}</div>}
     {state.muteReason && <div className="world-muted">🔇 你目前无法发言：{state.muteReason}</div>}
     {error && <div className="world-error">{error}<button onClick={() => setError("")}>×</button></div>}

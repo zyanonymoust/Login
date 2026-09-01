@@ -135,6 +135,11 @@
   display: grid;
   grid-template-columns: 75px 285px 1fr;
   overflow: hidden;
+  transition: grid-template-columns .22s ease;
+}
+@media (min-width: 901px) {
+  .woven-app.people-collapsed { grid-template-columns: 76px 0 1fr; }
+  .woven-app.people-collapsed .people-panel { padding-left: 0; padding-right: 0; opacity: 0; pointer-events: none; transform: translateX(-16px); }
 }
 .product-preview aside {
   background: #241f36;
@@ -292,8 +297,10 @@
   --accent2: #8fbd8a;
 }
 .app-sidebar {
-  background: #211d31;
-  color: white;
+  background: linear-gradient(180deg, #faf8ff 0%, #f0ecfa 100%);
+  color: var(--ink);
+  border-right: 1px solid var(--line);
+  box-shadow: 4px 0 18px #4a3c7610;
   padding: 20px 12px;
   display: flex;
   flex-direction: column;
@@ -321,7 +328,7 @@
   position: relative;
   height: 48px;
   background: transparent;
-  color: #aaa5b7;
+  color: #625a78;
   border: 0;
   border-radius: 12px;
   font-size: 20px;
@@ -329,8 +336,9 @@
 }
 .app-sidebar button.active,
 .app-sidebar button:hover {
-  background: #ffffff17;
-  color: white;
+  background: color-mix(in srgb, var(--accent) 17%, white);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 .app-sidebar button span {
   display: none;
@@ -348,13 +356,14 @@
 }
 .people-panel {
   position: relative;
-  background: white;
+  background: #fff;
   border-right: 1px solid var(--line);
   padding: 25px 18px 18px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  transition: padding .22s ease, opacity .18s ease, transform .22s ease;
 }
 .mobile-people-backdrop { display: none; }
 .panel-title {
@@ -374,7 +383,6 @@
   width: 36px;
   height: 36px;
 }
-.panel-title .panel-profile-button { display: grid; place-items: center; font-size: 16px; cursor: pointer; }
 .search {
   display: flex;
   gap: 8px;
@@ -1138,6 +1146,9 @@
 .dark-mode-setting > i.enabled { background: var(--accent); }
 .dark-mode-setting > i.enabled::before { left: 25px; }
 .woven-app.dark { position: relative; isolation: isolate; --ink: #f3f0fa; --muted: #aaa5b8; --line: #3a4161; --soft: #242942; overflow: hidden; background: radial-gradient(circle at 70% 5%, #273568 0, #11172b 34%, #090d1b 100%); color: var(--ink); }
+.woven-app.dark .app-sidebar { color: white; border-right-color: #302b43; background: #211d31; box-shadow: none; }
+.woven-app.dark .app-sidebar button:not(.app-logo) { color: #aaa5b7; }
+.woven-app.dark .app-sidebar button.active, .woven-app.dark .app-sidebar button:hover { color: white; background: #ffffff17; box-shadow: none; }
 .woven-app.dark::before { position: fixed; z-index: 0; inset: 0; pointer-events: none; content: ""; opacity: .8; background-image: radial-gradient(circle, #fff 0 1px, transparent 1.6px), radial-gradient(circle, #9ccaff 0 1.2px, transparent 1.8px), radial-gradient(circle, #fff 0 .8px, transparent 1.4px); background-position: 12px 17px, 47px 83px, 91px 41px; background-size: 97px 97px, 149px 149px, 61px 61px; animation: star-drift 45s linear infinite; }
 .woven-app.dark > * { position: relative; z-index: 1; }
 .woven-app.dark .people-panel, .woven-app.dark .app-main, .woven-app.dark .app-main > header, .woven-app.dark .chat-meta, .woven-app.dark .composer, .woven-app.dark .settings-view { background: rgba(16, 21, 39, .88); backdrop-filter: blur(14px); }
