@@ -648,6 +648,26 @@
 .welcome-block p {
   color: #c8c2d6;
 }
+.service-countdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  margin-top: 18px;
+  padding: 16px 20px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--soft) 90%, var(--accent) 10%);
+}
+.service-countdown > div:first-child { display: flex; flex-direction: column; gap: 4px; }
+.service-countdown > div:first-child span { color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: 1.1px; }
+.service-countdown > div:first-child strong { font: 700 16px Manrope; }
+.countdown-units { display: grid; grid-template-columns: repeat(4, minmax(54px, 1fr)); gap: 8px; }
+.countdown-units span { min-width: 54px; padding: 8px 10px; border-radius: 11px; background: var(--surface); text-align: center; }
+.countdown-units b, .countdown-units small { display: block; }
+.countdown-units b { color: var(--accent); font: 800 18px Manrope; }
+.countdown-units small { margin-top: 2px; color: var(--muted); font-size: 8px; text-transform: uppercase; }
+.service-countdown.expired { border-color: #ef6f77; }
 .home-view > h3,
 .quick-heading h3 {
   font: 700 18px Manrope;
@@ -1322,6 +1342,10 @@
   .welcome-block { min-height: 170px; padding: 22px 18px; border-radius: 17px; }
   .welcome-block h1 { margin: 9px 0; font-size: 27px; line-height: 1.06; letter-spacing: -1px; }
   .welcome-block p { margin: 0; font-size: 12px; }
+  .service-countdown { align-items: stretch; flex-direction: column; gap: 12px; padding: 14px; }
+  .countdown-units { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .countdown-units span { min-width: 0; padding: 7px 3px; }
+  .countdown-units b { font-size: 16px; }
   .quick-section { margin-top: 18px; gap: 12px; }
   .quick-heading { margin-top: 19px; }
   .quick-heading h3, .break-heading h3 { font-size: 17px; }

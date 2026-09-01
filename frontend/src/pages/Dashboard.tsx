@@ -706,6 +706,7 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
+            <ServiceCountdown />
             <div className="quick-section">
               <div className="quick-conversations">
                 <div className="quick-heading">
@@ -1142,6 +1143,29 @@ function FriendshipSpark() {
       <h4>{prompt}</h4>
       <button onClick={shufflePrompt}>Give me another <span>↻</span></button>
     </article>
+  );
+}
+function ServiceCountdown() {
+  const deadline = new Date(import.meta.env.VITE_SERVICE_END_DATE || "2026-09-26T23:59:59+08:00").getTime();
+  const [remaining, setRemaining] = useState(() => Math.max(0, deadline - Date.now()));
+  useEffect(() => {
+    const timer = window.setInterval(() => setRemaining(Math.max(0, deadline - Date.now())), 1000);
+    return () => window.clearInterval(timer);
+  }, [deadline]);
+  const days = Math.floor(remaining / 86400000);
+  const hours = Math.floor((remaining % 86400000) / 3600000);
+  const minutes = Math.floor((remaining % 3600000) / 60000);
+  const seconds = Math.floor((remaining % 60000) / 1000);
+  return (
+    <section className={`service-countdown ${remaining === 0 ? "expired" : ""}`} aria-label="Hosting countdown">
+      <div><span>HOSTING STATUS</span><strong>{remaining === 0 ? "Service deadline reached" : "Woven hosting ends in"}</strong></div>
+      {remaining > 0 && <div className="countdown-units">
+        <span><b>{days}</b><small>Days</small></span>
+        <span><b>{hours}</b><small>Hours</small></span>
+        <span><b>{minutes}</b><small>Minutes</small></span>
+        <span><b>{seconds}</b><small>Seconds</small></span>
+      </div>}
+    </section>
   );
 }
 function Group({
