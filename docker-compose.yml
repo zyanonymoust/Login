@@ -19,7 +19,6 @@ services:
       start_period: 10s
 
   server:
-    image: login-server
     build:
       context: .
       dockerfile: Login.Server/Dockerfile
@@ -40,7 +39,6 @@ services:
         condition: service_healthy                                                                                                                                                                                                                                                                                                                                                                                            
 
   frontend:
-    image: login-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile

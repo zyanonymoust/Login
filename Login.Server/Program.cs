@@ -129,6 +129,14 @@ app.UseAuthorization();
 
 app.UseRateLimiter();
 
+app.MapGet("/health", async (AppDbContext db, CancellationToken cancellationToken) =>
+{
+    var databaseAvailable = await db.Database.CanConnectAsync(cancellationToken);
+    return databaseAvailable
+        ? Results.Ok(new { status = "healthy", database = "connected", timestamp = DateTime.UtcNow })
+        : Results.Json(new { status = "unhealthy", database = "unavailable", timestamp = DateTime.UtcNow }, statusCode: StatusCodes.Status503ServiceUnavailable);
+}).AllowAnonymous();
+
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 

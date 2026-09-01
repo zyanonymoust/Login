@@ -54,7 +54,8 @@ export default function Dashboard() {
     chatHubRef = useRef<HubConnection | null>(null),
     messageListRef = useRef<HTMLDivElement>(null),
     pinnedToLatestRef = useRef(true),
-    autoAwayRef = useRef(false);
+    autoAwayRef = useRef(false),
+    selectedIdRef = useRef<number | undefined>(undefined);
   const nav = useNavigate(),
     [me, setMe] = useState<Me>(() =>
       JSON.parse(localStorage.getItem("user") || "{}"),
@@ -62,6 +63,8 @@ export default function Dashboard() {
     [people, setPeople] = useState<Person[]>([]),
     [selected, setSelected] = useState<Person | null>(null),
     [messages, setMessages] = useState<Message[]>([]),
+    [hasOlderMessages, setHasOlderMessages] = useState(false),
+    [loadingOlderMessages, setLoadingOlderMessages] = useState(false),
     [profilePerson, setProfilePerson] = useState<Person | null>(null),
     [liveToast, setLiveToast] = useState<{ title: string; body: string; type: string } | null>(null),
     [messageDetails, setMessageDetails] = useState<Message | null>(null),
@@ -97,6 +100,7 @@ export default function Dashboard() {
       () => localStorage.getItem("woven-chat-bg") || "default",
     );
   const selectedId = selected?.id;
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   const refresh = useCallback(async () => {
     try {
       const d = await apiRequest<Person[]>("/api/social/people");
@@ -138,6 +142,7 @@ export default function Dashboard() {
       .then((d) => {
         if (!a) return;
         setMessages(d);
+        setHasOlderMessages(d.length === 50);
         refresh();
         refreshNotifications();
       })
@@ -150,6 +155,7 @@ export default function Dashboard() {
     pinnedToLatestRef.current = true;
     setShowLatestButton(false);
     setChatError("");
+    setHasOlderMessages(false);
     setDraft(selectedId ? localStorage.getItem(`woven-draft-${selectedId}`) || "" : "");
   }, [selectedId]);
   useEffect(() => {
@@ -204,29 +210,31 @@ export default function Dashboard() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
-    const base = import.meta.env.VITE_API_URL || "http://localhost:5436",
+    const base = API_BASE_URL,
       c = new HubConnectionBuilder()
         .withUrl(`${base}/hubs/chat`, {
           accessTokenFactory: () => token,
           withCredentials: false,
         })
-        .withAutomaticReconnect()
+        .withAutomaticReconnect([0, 1500, 5000, 10000, 20000])
         .configureLogging(LogLevel.Warning)
         .build();
     c.on("MessageReceived", (m: Message) => {
       refresh();
       refreshRecent();
+      const activeId = selectedIdRef.current;
       if (
-        selectedId &&
-        (m.senderId === selectedId || m.recipientId === selectedId)
+        activeId &&
+        (m.senderId === activeId || m.recipientId === activeId)
       )
         setMessages((x) => (x.some((y) => y.id === m.id) ? x : [...x, { ...m, isUnread: true }]));
     });
     c.on("MessageSent", (m: Message) => {
       refreshRecent();
+      const activeId = selectedIdRef.current;
       if (
-        selectedId &&
-        (m.senderId === selectedId || m.recipientId === selectedId)
+        activeId &&
+        (m.senderId === activeId || m.recipientId === activeId)
       )
         setMessages((items) => {
           const optimisticIndex = m.clientMessageId
@@ -237,7 +245,7 @@ export default function Dashboard() {
         });
     });
     c.on("MessagesRead", (r: { readBy: number; readAt: string }) => {
-      if (selectedId === r.readBy)
+      if (selectedIdRef.current === r.readBy)
         setMessages((x) =>
           x.map((m) =>
             m.recipientId === r.readBy ? { ...m, readAt: r.readAt } : m,
@@ -256,7 +264,7 @@ export default function Dashboard() {
       setMessages((messages) => messages.map((message) => message.id === item.id ? { ...message, reactions: item.reactions.map((reaction) => ({ ...reaction, reactedByMe: item.userId === (me.id || me.userId) && reaction.emoji === item.emoji ? item.added : message.reactions?.find((old) => old.emoji === reaction.emoji)?.reactedByMe })) } : message));
     });
     c.on("TypingChanged", (item: { userId: number; isTyping: boolean }) => {
-      if (item.userId === selectedId) setIsTyping(item.isTyping);
+      if (item.userId === selectedIdRef.current) setIsTyping(item.isTyping);
     });
     c.on("PresenceChanged", (item: { userId: number; online: boolean; status?: string }) => {
       setPeople((items) => items.map((person) => person.id === item.userId ? { ...person, online: item.online, status: item.status || person.status } : person));
@@ -271,12 +279,35 @@ export default function Dashboard() {
       setLiveToast({ title: item.title || "Woven", body: item.body || "You have a new notification.", type: item.type || "activity" });
       if (desktopNotifications && "Notification" in window && window.Notification.permission === "granted" && document.hidden) new window.Notification(item.title || "Woven", { body: item.body || "You have a new notification." });
     });
-    c.start().then(() => { chatHubRef.current = c; }).catch(() => {});
+    let disposed = false;
+    c.onreconnecting(() => setChatError("Connection interrupted. Reconnecting…"));
+    c.onreconnected(() => {
+      setChatError("");
+      refresh();
+      refreshGroups();
+      refreshNotifications();
+    });
+    c.onclose(() => setChatError("Real-time connection is offline. Refresh the page to reconnect."));
+    chatHubRef.current = c;
+    const startConnection = async () => {
+      while (!disposed) {
+        try {
+          await c.start();
+          setChatError("");
+          return;
+        } catch {
+          setChatError("Real-time connection is offline. Woven will keep trying to reconnect.");
+          await new Promise((resolve) => window.setTimeout(resolve, 5000));
+        }
+      }
+    };
+    void startConnection();
     return () => {
+      disposed = true;
       if (chatHubRef.current === c) chatHubRef.current = null;
       c.stop().catch(() => {});
     };
-  }, [selectedId, refresh, refreshGroups, refreshRecent, refreshNotifications, me.id, me.userId, desktopNotifications]);
+  }, [refresh, refreshGroups, refreshRecent, refreshNotifications, me.id, me.userId, desktopNotifications]);
   useEffect(() => {
     if (!selectedId || !chatHubRef.current) return;
     chatHubRef.current.invoke("SendTyping", selectedId, draft.trim().length > 0).catch(() => {});
@@ -522,11 +553,34 @@ export default function Dashboard() {
         setUploading(false);
         e.target.value = "";
       }
+    },
+    loadOlderMessages = async () => {
+      if (!selectedId || loadingOlderMessages || !hasOlderMessages) return;
+      const firstId = messages.find((message) => message.id > 0)?.id;
+      const list = messageListRef.current;
+      if (!firstId || !list) return;
+      const previousHeight = list.scrollHeight;
+      const previousTop = list.scrollTop;
+      setLoadingOlderMessages(true);
+      try {
+        const older = await apiRequest<Message[]>(`/api/messages/${selectedId}?before=${firstId}&limit=50`);
+        setMessages((items) => [...older.filter((olderMessage) => !items.some((item) => item.id === olderMessage.id)), ...items]);
+        setHasOlderMessages(older.length === 50);
+        window.requestAnimationFrame(() => {
+          const current = messageListRef.current;
+          if (current) current.scrollTop = previousTop + current.scrollHeight - previousHeight;
+        });
+      } catch (error) {
+        setChatError(error instanceof Error ? error.message : "Older messages could not be loaded.");
+      } finally {
+        setLoadingOlderMessages(false);
+      }
     };
   const firstUnreadId = messages.find((message) => message.isUnread)?.id,
     trackMessageScroll = () => {
       const list = messageListRef.current;
       if (!list) return;
+      if (list.scrollTop < 80) void loadOlderMessages();
       const atLatest = list.scrollHeight - list.scrollTop - list.clientHeight <= 24;
       pinnedToLatestRef.current = atLatest;
       setShowLatestButton(!atLatest);
@@ -778,6 +832,7 @@ export default function Dashboard() {
               </div>
             )}
             <div className="message-list" ref={messageListRef} onScroll={trackMessageScroll}>
+              {hasOlderMessages && <button className="load-older-messages" type="button" onClick={loadOlderMessages} disabled={loadingOlderMessages}>{loadingOlderMessages ? "Loading…" : "Load older messages"}</button>}
               {!messages.length && (
                 <div className="start-chat">
                   <Avatar name={selected.name} avatarUrl={selected.avatarUrl} />
