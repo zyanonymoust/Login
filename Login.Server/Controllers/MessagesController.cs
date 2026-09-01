@@ -74,6 +74,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
     {
         var content = request.Content.Trim(); if (content.Length is < 1 or > 4000) return BadRequest(new { message = "Message must be between 1 and 4000 characters." });
         if (!await db.Users.AnyAsync(x => x.Id == otherId)) return NotFound();
+        if (await db.UserBlocks.AnyAsync(x => (x.BlockerId == UserId && x.BlockedId == otherId) || (x.BlockerId == otherId && x.BlockedId == UserId))) return Conflict(new { message = "Messaging is unavailable for this conversation." });
         var replyTo = request.ReplyToId.HasValue
             ? await db.Messages.AsNoTracking().Where(x => x.Id == request.ReplyToId && ((x.SenderId == UserId && x.RecipientId == otherId) || (x.SenderId == otherId && x.RecipientId == UserId))).Select(x => new { x.Id, x.SenderId, x.Content, x.AttachmentName }).FirstOrDefaultAsync()
             : null;
@@ -165,6 +166,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
     {
         if (file.Length is < 1 or > 10_000_000) return BadRequest(new { message = "File must be smaller than 10 MB." });
         if (!await db.Users.AnyAsync(x => x.Id == otherId)) return NotFound();
+        if (await db.UserBlocks.AnyAsync(x => (x.BlockerId == UserId && x.BlockedId == otherId) || (x.BlockerId == otherId && x.BlockedId == UserId))) return Conflict(new { message = "Messaging is unavailable for this conversation." });
         var safeName = Path.GetFileName(file.FileName);
         var extension = Path.GetExtension(safeName);
         if (!AllowedAttachmentTypes.TryGetValue(extension, out var contentTypes) || !contentTypes.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))

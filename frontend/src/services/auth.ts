@@ -6,6 +6,8 @@ export interface AuthResponse {
     email: string;
     token: string;
     expiration: string;
+    isAdmin: boolean;
+    mustChangePassword: boolean;
 }
 
 export interface RegisterData {
@@ -48,7 +50,9 @@ export function saveAuth(data: AuthResponse) {
         JSON.stringify({
             userId: data.userId,
             name: data.name,
-            email: data.email
+            email: data.email,
+            isAdmin: data.isAdmin,
+            mustChangePassword: data.mustChangePassword
         })
     );
 }

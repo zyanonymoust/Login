@@ -7,6 +7,7 @@ import { API_BASE_URL, apiRequest } from "../services/api";
 import { logout } from "../services/auth";
 import JumpGame from "../components/JumpGame";
 import GroupSpace from "../components/GroupSpace";
+import WorldChat from "../components/WorldChat";
 import "./social.css";
 type Person = {
   id: number;
@@ -20,6 +21,7 @@ type Person = {
   incoming: boolean;
   unread: number;
   avatarUrl?: string;
+  isAdmin?: boolean;
 };
 type Message = {
   id: number;
@@ -45,6 +47,8 @@ type Me = {
   bio?: string;
   status?: string;
   avatarUrl?: string;
+  isAdmin?: boolean;
+  mustChangePassword?: boolean;
 };
 type RecentConversation = { kind: "person" | "group"; id: number; name: string; preview: string; activityAt: string; memberCount: number };
 type AppNotification = { id: number; type: string; title: string; body: string; targetKind: "person" | "group"; targetId: number; count: number; isRead: boolean; createdAt: string };
@@ -82,7 +86,7 @@ export default function Dashboard() {
     [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]),
     [notifications, setNotifications] = useState<AppNotification[]>([]),
     [selectedGroupId, setSelectedGroupId] = useState<number | null>(null),
-    [view, setView] = useState<"chat" | "home" | "groups" | "profile" | "settings">(
+    [view, setView] = useState<"chat" | "home" | "groups" | "world" | "profile" | "settings">(
       "home",
     ),
     [query, setQuery] = useState(""),
@@ -125,7 +129,11 @@ export default function Dashboard() {
   }, [refreshNotifications]);
   useEffect(() => {
     apiRequest<Me>("/api/auth/me")
-      .then(setMe)
+      .then((user) => {
+        setMe(user);
+        localStorage.setItem("user", JSON.stringify(user));
+        if (user.mustChangePassword) setView("profile");
+      })
       .catch(() => {});
     refresh(); refreshGroups(); refreshRecent(); refreshNotifications();
     apiRequest("/api/social/heartbeat", { method: "POST" }).catch(() => {});
@@ -273,6 +281,11 @@ export default function Dashboard() {
     c.on("FriendRequestUpdated", refresh);
     c.on("GroupInviteReceived", refreshGroups);
     c.on("GroupMembershipChanged", () => { refreshGroups(); refreshRecent(); });
+    c.on("PasswordResetRequired", () => {
+      setMe((current) => ({ ...current, mustChangePassword: true }));
+      setView("profile");
+      window.alert("Owner 已重置你的密码。请立即设置新密码。");
+    });
     c.on("NotificationReceived", (item: { title?: string; body?: string; type?: string }) => {
       refreshNotifications();
       if (item.type === "group-message") refreshGroups();
@@ -438,6 +451,11 @@ export default function Dashboard() {
       const form = new FormData(event.currentTarget);
       await apiRequest("/api/social/password", { method: "PUT", body: JSON.stringify({ currentPassword: form.get("currentPassword"), newPassword: form.get("newPassword"), confirmPassword: form.get("confirmPassword") }) });
       event.currentTarget.reset();
+      setMe((current) => {
+        const updated = { ...current, mustChangePassword: false };
+        localStorage.setItem("user", JSON.stringify(updated));
+        return updated;
+      });
       window.alert("Password changed successfully.");
     },
     replyToMessage = (message: Message) => {
@@ -624,6 +642,9 @@ export default function Dashboard() {
           <button aria-label="Groups" className={view === "groups" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}>
             👥<span>Groups</span>{pendingGroups.length > 0 && <b>{pendingGroups.length}</b>}
           </button>
+          <button aria-label="World Chat" className={view === "world" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("world"); }}>
+            🌍<span>World</span>
+          </button>
         </nav>
         <div className="side-bottom">
           <button aria-label="Toggle dark mode" onClick={() => setDarkMode((value) => !value)} title="Toggle dark mode">
@@ -705,6 +726,8 @@ export default function Dashboard() {
                     ? "Appearance"
                     : view === "groups"
                       ? "Groups"
+                    : view === "world"
+                      ? "World Chat"
                     : "Good day, " + (me.name?.split(" ")[0] || "friend")}
             </h2>
           </div>
@@ -799,6 +822,7 @@ export default function Dashboard() {
           </section>
         )}
         {view === "groups" && <GroupSpace rooms={groupRooms} people={people} me={me} initialRoomId={selectedGroupId} onRoomsChanged={refreshGroups} onRoomRead={handleRoomRead} />}
+        {view === "world" && <WorldChat me={me} />}
         {view === "chat" && selected && (
           <section
             className={`chat-view bg-${chatBg.startsWith("data:") ? "custom" : chatBg}`}
@@ -918,6 +942,7 @@ export default function Dashboard() {
           </section>
         )}
         {view === "profile" && (<section className="profile-page">
+          {me.mustChangePassword && <div className="password-reset-warning"><strong>必须修改密码</strong><span>你目前使用的是临时密码 123456。请在下方立即设置新密码。</span></div>}
           <form className="settings-view" onSubmit={save}>
             <div className="profile-edit">
               <Avatar name={me.name} avatarUrl={me.avatarUrl} />

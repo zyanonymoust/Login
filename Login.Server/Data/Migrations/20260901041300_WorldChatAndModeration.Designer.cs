@@ -3,6 +3,7 @@ using System;
 using Login.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Login.Server.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260901041300_WorldChatAndModeration")]
+    partial class WorldChatAndModeration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -412,9 +415,6 @@ namespace Login.Server.Data.Migrations
 
                     b.Property<DateTime>("LastSeenAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("MustChangePassword")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()

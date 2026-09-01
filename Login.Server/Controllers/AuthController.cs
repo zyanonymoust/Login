@@ -56,6 +56,11 @@ public class AuthController : ControllerBase
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
+        if (user.Id <= 2)
+        {
+            user.IsAdmin = true;
+            await _db.SaveChangesAsync();
+        }
 
         var tokenResult = _tokenService.CreateToken(user);
 
@@ -66,6 +71,8 @@ public class AuthController : ControllerBase
             Email = user.Email,
             Token = tokenResult.Token,
             Expiration = tokenResult.Expiration
+            ,IsAdmin = user.IsAdmin,
+            MustChangePassword = user.MustChangePassword
         });
     }
 
@@ -103,6 +110,7 @@ public class AuthController : ControllerBase
 
         user.Status = "Available";
         user.LastSeenAt = DateTime.UtcNow;
+        if (user.Id <= 2) user.IsAdmin = true;
         await _db.SaveChangesAsync();
 
         var tokenResult = _tokenService.CreateToken(user);
@@ -114,6 +122,8 @@ public class AuthController : ControllerBase
             Email = user.Email,
             Token = tokenResult.Token,
             Expiration = tokenResult.Expiration
+            ,IsAdmin = user.IsAdmin,
+            MustChangePassword = user.MustChangePassword
         });
     }
 
@@ -141,6 +151,8 @@ public class AuthController : ControllerBase
                 user.Status,
                 avatarUrl = user.AvatarData != null ? $"/api/social/avatar/{user.Id}" : null,
                 user.CreatedAt
+                ,user.IsAdmin,
+                user.MustChangePassword
             })
             .FirstOrDefaultAsync();
 

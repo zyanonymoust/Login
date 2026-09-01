@@ -19,6 +19,12 @@ public class AppDbContext : DbContext
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<MessageReaction> MessageReactions { get; set; }
     public DbSet<ConversationPreference> ConversationPreferences { get; set; }
+    public DbSet<WorldMessage> WorldMessages { get; set; }
+    public DbSet<WorldMessageReaction> WorldMessageReactions { get; set; }
+    public DbSet<UserBlock> UserBlocks { get; set; }
+    public DbSet<UserReport> UserReports { get; set; }
+    public DbSet<WorldChatMute> WorldChatMutes { get; set; }
+    public DbSet<WorldChatSetting> WorldChatSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -113,6 +119,57 @@ public class AppDbContext : DbContext
             entity.HasIndex(x => new { x.UserId, x.OtherUserId }).IsUnique();
             entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.OtherUser).WithMany().HasForeignKey(x => x.OtherUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<WorldMessage>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.Channel, x.Id });
+            entity.Property(x => x.Channel).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Content).HasMaxLength(2000).IsRequired();
+            entity.Property(x => x.AttachmentName).HasMaxLength(255);
+            entity.Property(x => x.AttachmentContentType).HasMaxLength(120);
+            entity.HasOne(x => x.Sender).WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.ReplyTo).WithMany(x => x.Replies).HasForeignKey(x => x.ReplyToId).OnDelete(DeleteBehavior.SetNull);
+        });
+        modelBuilder.Entity<WorldMessageReaction>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.WorldMessageId, x.UserId, x.Emoji }).IsUnique();
+            entity.Property(x => x.Emoji).HasMaxLength(16).IsRequired();
+            entity.HasOne(x => x.WorldMessage).WithMany(x => x.Reactions).HasForeignKey(x => x.WorldMessageId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<UserBlock>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.BlockerId, x.BlockedId }).IsUnique();
+            entity.HasOne(x => x.Blocker).WithMany().HasForeignKey(x => x.BlockerId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Blocked).WithMany().HasForeignKey(x => x.BlockedId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<UserReport>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Reason).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Details).HasMaxLength(500);
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.HasOne(x => x.Reporter).WithMany().HasForeignKey(x => x.ReporterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.ReportedUser).WithMany().HasForeignKey(x => x.ReportedUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.WorldMessage).WithMany().HasForeignKey(x => x.WorldMessageId).OnDelete(DeleteBehavior.SetNull);
+        });
+        modelBuilder.Entity<WorldChatMute>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.UserId).IsUnique();
+            entity.Property(x => x.Reason).HasMaxLength(300);
+            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.MutedBy).WithMany().HasForeignKey(x => x.MutedById).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<WorldChatSetting>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Announcement).HasMaxLength(1000);
+            entity.HasOne(x => x.UpdatedBy).WithMany().HasForeignKey(x => x.UpdatedById).OnDelete(DeleteBehavior.SetNull);
+            entity.HasData(new WorldChatSetting { Id = 1, Announcement = "Welcome to Woven World Chat", SlowModeSeconds = 5, UpdatedAt = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) });
         });
     }
 }

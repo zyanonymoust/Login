@@ -12,8 +12,11 @@ public class ChatHub(AppDbContext db) : Hub
 {
     private static readonly ConcurrentDictionary<string, HashSet<int>> MeetingRooms = new();
     private static readonly ConcurrentDictionary<int, int> UserConnections = new();
+    private static readonly string[] WorldChannels = ["general", "gaming", "technology", "music", "movies", "study"];
     public static string UserGroup(int userId) => $"user-{userId}";
     public static string RoomGroup(int roomId) => $"room-{roomId}";
+    public static string WorldGroup(string channel) => $"world-{channel}";
+    public static int OnlineCount => UserConnections.Count;
     private static string MeetingGroup(int roomId) => $"meeting-{roomId}";
 
     private int CurrentUserId => int.Parse(Context.User!.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -25,9 +28,19 @@ public class ChatHub(AppDbContext db) : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, RoomGroup(roomId));
     }
 
+    public async Task JoinWorldChannel(string channel)
+    {
+        var normalized = channel.Trim().ToLowerInvariant();
+        if (!WorldChannels.Contains(normalized)) throw new HubException("Unknown world channel.");
+        foreach (var item in WorldChannels) await Groups.RemoveFromGroupAsync(Context.ConnectionId, WorldGroup(item));
+        await Groups.AddToGroupAsync(Context.ConnectionId, WorldGroup(normalized));
+        await Clients.Caller.SendAsync("WorldOnlineCount", new { count = OnlineCount });
+    }
+
     public async Task SendTyping(int otherUserId, bool isTyping)
     {
         if (otherUserId == CurrentUserId || !await db.Users.AnyAsync(x => x.Id == otherUserId)) return;
+        if (await db.UserBlocks.AnyAsync(x => (x.BlockerId == CurrentUserId && x.BlockedId == otherUserId) || (x.BlockerId == otherUserId && x.BlockedId == CurrentUserId))) return;
         await Clients.Group(UserGroup(otherUserId)).SendAsync("TypingChanged", new { userId = CurrentUserId, isTyping });
     }
 
@@ -62,7 +75,11 @@ public class ChatHub(AppDbContext db) : Hub
             var user = await db.Users.FindAsync(userId);
             if (user is not null) { user.LastSeenAt = DateTime.UtcNow; await db.SaveChangesAsync(); }
             var connections = UserConnections.AddOrUpdate(userId, 1, (_, count) => count + 1);
-            if (connections == 1) await Clients.All.SendAsync("PresenceChanged", new { userId, online = true, status = user?.Status ?? "Available" });
+            if (connections == 1)
+            {
+                await Clients.All.SendAsync("PresenceChanged", new { userId, online = true, status = user?.Status ?? "Available" });
+                await Clients.All.SendAsync("WorldOnlineCount", new { count = OnlineCount });
+            }
         }
         await base.OnConnectedAsync();
     }
@@ -79,6 +96,7 @@ public class ChatHub(AppDbContext db) : Hub
             {
                 UserConnections.TryRemove(userId, out _);
                 await Clients.All.SendAsync("PresenceChanged", new { userId, online = false, status = user?.Status ?? "Away" });
+                await Clients.All.SendAsync("WorldOnlineCount", new { count = OnlineCount });
             }
         }
         if (MeetingRooms.TryRemove(Context.ConnectionId, out var rooms))

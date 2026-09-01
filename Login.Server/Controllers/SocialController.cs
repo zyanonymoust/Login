@@ -18,8 +18,9 @@ public class SocialController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     public async Task<IActionResult> People()
     {
         var me = UserId;
+        var hiddenUserIds = await db.UserBlocks.AsNoTracking().Where(x => x.BlockerId == me || x.BlockedId == me).Select(x => x.BlockerId == me ? x.BlockedId : x.BlockerId).ToListAsync();
         var links = await db.Friendships.Where(x => x.RequesterId == me || x.AddresseeId == me).ToListAsync();
-        var users = await db.Users.AsNoTracking().Where(x => x.Id != me).OrderBy(x => x.Name).ToListAsync();
+        var users = await db.Users.AsNoTracking().Where(x => x.Id != me && !hiddenUserIds.Contains(x.Id)).OrderBy(x => x.Name).ToListAsync();
         var myGroupIds = await db.GroupMembers.AsNoTracking().Where(x => x.UserId == me && x.Status == "accepted").Select(x => x.GroupRoomId).ToListAsync();
         var mutualGroups = await db.GroupMembers.AsNoTracking().Where(x => x.UserId != me && x.Status == "accepted" && myGroupIds.Contains(x.GroupRoomId)).GroupBy(x => x.UserId).Select(x => new { UserId = x.Key, Count = x.Count() }).ToDictionaryAsync(x => x.UserId, x => x.Count);
         return Ok(users.Select(u => {
@@ -36,6 +37,7 @@ public class SocialController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     public async Task<IActionResult> AddFriend(int otherId)
     {
         if (otherId == UserId || !await db.Users.AnyAsync(x => x.Id == otherId)) return BadRequest(new { message = "Invalid user." });
+        if (await db.UserBlocks.AnyAsync(x => (x.BlockerId == UserId && x.BlockedId == otherId) || (x.BlockerId == otherId && x.BlockedId == UserId))) return Conflict(new { message = "This user is unavailable." });
         var existing = await db.Friendships.FirstOrDefaultAsync(x => (x.RequesterId == UserId && x.AddresseeId == otherId) || (x.RequesterId == otherId && x.AddresseeId == UserId));
         if (existing is null)
         {
@@ -91,6 +93,27 @@ public class SocialController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
         await hub.Clients.All.SendAsync("PresenceChanged", new { userId = UserId, online = u.Status != "Invisible", status = u.Status });
         return Ok(new { u.Id, u.Name, u.Email, u.Bio, u.Status, avatarUrl = u.AvatarData != null ? $"/api/social/avatar/{u.Id}" : null });
     }
+    [HttpGet("blocks")]
+    public async Task<IActionResult> Blocks() => Ok(await db.UserBlocks.AsNoTracking().Where(x => x.BlockerId == UserId).OrderByDescending(x => x.CreatedAt).Select(x => new { id = x.BlockedId, x.Blocked.Name, x.CreatedAt }).ToListAsync());
+
+    [HttpPost("blocks/{otherId:int}")]
+    public async Task<IActionResult> Block(int otherId)
+    {
+        if (otherId == UserId || !await db.Users.AnyAsync(x => x.Id == otherId)) return BadRequest();
+        if (!await db.UserBlocks.AnyAsync(x => x.BlockerId == UserId && x.BlockedId == otherId)) db.UserBlocks.Add(new UserBlock { BlockerId = UserId, BlockedId = otherId });
+        var friendships = await db.Friendships.Where(x => (x.RequesterId == UserId && x.AddresseeId == otherId) || (x.RequesterId == otherId && x.AddresseeId == UserId)).ToListAsync();
+        db.Friendships.RemoveRange(friendships);
+        await db.SaveChangesAsync();
+        await hub.Clients.Group(ChatHub.UserGroup(otherId)).SendAsync("FriendRequestUpdated", new { userId = UserId, status = "blocked" });
+        return NoContent();
+    }
+
+    [HttpDelete("blocks/{otherId:int}")]
+    public async Task<IActionResult> Unblock(int otherId)
+    {
+        var block = await db.UserBlocks.FirstOrDefaultAsync(x => x.BlockerId == UserId && x.BlockedId == otherId);
+        if (block is null) return NotFound(); db.UserBlocks.Remove(block); await db.SaveChangesAsync(); return NoContent();
+    }
     [HttpPut("status")]
     public async Task<IActionResult> SetStatus(StatusRequest request)
     {
@@ -113,6 +136,7 @@ public class SocialController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
         if (user is null) return NotFound();
         if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash)) return BadRequest(new { message = "Current password is incorrect." });
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        user.MustChangePassword = false;
         await db.SaveChangesAsync();
         return NoContent();
     }

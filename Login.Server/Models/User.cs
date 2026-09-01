@@ -35,6 +35,10 @@ public class User
     [MaxLength(40)]
     public string? AvatarContentType { get; set; }
 
+    public bool IsAdmin { get; set; }
+
+    public bool MustChangePassword { get; set; }
+
     [JsonIgnore]
     public List<TaskItem> Tasks { get; set; } = [];
 }

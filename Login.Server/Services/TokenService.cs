@@ -36,6 +36,7 @@ public class TokenService
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Name),
             new(ClaimTypes.Email, user.Email),
+            new(ClaimTypes.Role, user.IsAdmin ? "Admin" : "User"),
             new(
                 JwtRegisteredClaimNames.Jti,
                 Guid.NewGuid().ToString())

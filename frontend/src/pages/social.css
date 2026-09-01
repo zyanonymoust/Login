@@ -186,6 +186,8 @@
 .profile-page { height: calc(100vh - 86px); overflow: auto; }
 .profile-page .settings-view { min-height: auto; }
 .password-settings { margin-top: 18px; }
+.password-reset-warning { margin: 18px auto 0; width: min(760px, calc(100% - 32px)); padding: 14px 18px; display: flex; flex-direction: column; gap: 4px; border: 1px solid #e9a94d; border-radius: 13px; color: #744500; background: #fff4d8; }
+.woven-app.dark .password-reset-warning { color: #ffd991; background: #392b18; }
 .avatar-actions { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
 .avatar-actions label, .avatar-actions button { padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--soft); cursor: pointer; }
 .avatar-actions input { display: none; }
