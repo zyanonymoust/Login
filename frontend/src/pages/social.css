@@ -1357,7 +1357,7 @@
   .app-main:has(.chat-mode-tabs) .chat-view, .app-main:has(.chat-mode-tabs) .group-space, .app-main:has(.chat-mode-tabs) .world-chat, .app-main:has(.chat-mode-tabs) .chat-hub-empty { height: calc(100dvh - 182px); }
   .chat-meta { padding: 10px 12px; flex-wrap: wrap; }
   .chat-search { order: 4; flex-basis: calc(100% - 52px); margin-left: 0; }
-  .composer { padding: 10px; }
+  .composer { margin: 0 8px 8px; padding: 10px; border: 1px solid var(--line); border-radius: 13px; }
   .group-space { height: calc(100dvh - 136px); }
   .profile-friend-facts { flex-direction: column; text-align: center; }
   .app-main {

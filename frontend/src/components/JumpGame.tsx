@@ -33,10 +33,7 @@ const GAME_WIDTH = 900;
 const GAME_HEIGHT = 420;
 const GRAVITY = 1150;
 const MAX_CHARGE_TIME = 1200;
-const MAX_POWER_HOLD_TIME = 1000;
-const CHARGE_CYCLE_TIME =
-    MAX_CHARGE_TIME +
-    MAX_POWER_HOLD_TIME;
+const MAX_POWER_HOLD_TIME = 2000;
 
 function createStartingPlatforms(): Platform[] {
     const platforms: Platform[] = [
@@ -115,6 +112,8 @@ function JumpGame() {
 
     const cameraXRef = useRef(0);
     const chargingRef = useRef(false);
+    const manualChargingRef = useRef(false);
+    const chargeExpiredRef = useRef(false);
     const chargeStartedAtRef = useRef(0);
     const chargeRef = useRef(0);
     const currentPlatformRef = useRef(0);
@@ -212,6 +211,8 @@ function JumpGame() {
 
         cameraXRef.current = 0;
         chargingRef.current = false;
+        manualChargingRef.current = false;
+        chargeExpiredRef.current = false;
         chargeStartedAtRef.current = 0;
         chargeRef.current = 0;
         currentPlatformRef.current = 0;
@@ -232,6 +233,7 @@ function JumpGame() {
             "playing" ||
             !playerRef.current.grounded ||
             chargingRef.current
+            || chargeExpiredRef.current
         ) {
             return;
         }
@@ -245,6 +247,11 @@ function JumpGame() {
     }, []);
 
     const releaseCharge = useCallback(() => {
+        if (chargeExpiredRef.current) {
+            chargeExpiredRef.current = false;
+            return;
+        }
+
         if (
             gameStateRef.current !==
             "playing" ||
@@ -258,22 +265,26 @@ function JumpGame() {
             chargeRef.current;
 
         chargingRef.current = false;
+        manualChargingRef.current = false;
+        chargeExpiredRef.current = false;
         chargeRef.current = 0;
         setCharge(0);
 
-        if (finalCharge < 0.05) {
+        if (finalCharge <= 0) {
             return;
         }
 
         const player = playerRef.current;
+        const effectivePower =
+            Math.pow(finalCharge, 1.15);
 
         player.grounded = false;
 
         player.velocityX =
-            130 + finalCharge * 470;
+            effectivePower * 740;
 
         player.velocityY =
-            -(300 + finalCharge * 430);
+            -(effectivePower * 840);
     }, []);
 
     const finishGame = useCallback(() => {
@@ -285,6 +296,7 @@ function JumpGame() {
         }
 
         chargingRef.current = false;
+        manualChargingRef.current = false;
         chargeRef.current = 0;
         setCharge(0);
 
@@ -969,27 +981,23 @@ function JumpGame() {
 
             if (
                 chargingRef.current &&
-                player.grounded
+                player.grounded &&
+                !manualChargingRef.current
             ) {
                 const elapsed =
                     animationTime -
                     chargeStartedAtRef.current;
 
-                const cycleElapsed =
-                    elapsed %
-                    CHARGE_CYCLE_TIME;
-
-                const nextCharge =
-                    cycleElapsed >=
-                        MAX_CHARGE_TIME
-                        ? 1
-                        : cycleElapsed /
-                        MAX_CHARGE_TIME;
-
-                chargeRef.current =
-                    nextCharge;
-
-                setCharge(nextCharge);
+                if (elapsed >= MAX_CHARGE_TIME + MAX_POWER_HOLD_TIME) {
+                    chargingRef.current = false;
+                    chargeExpiredRef.current = true;
+                    chargeRef.current = 0;
+                    setCharge(0);
+                } else {
+                    const nextCharge = Math.min(1, elapsed / MAX_CHARGE_TIME);
+                    chargeRef.current = nextCharge;
+                    setCharge(nextCharge);
+                }
             }
 
             if (!player.grounded) {
@@ -1247,7 +1255,7 @@ function JumpGame() {
                         <h3>Jump Adventure</h3>
 
                         <p>
-                            Hold to charge and release
+                            Drag the power bar and release
                             to jump.
                         </p>
                     </div>
@@ -1269,25 +1277,9 @@ function JumpGame() {
             <div
                 className="jump-game-stage"
                 onPointerDown={(event) => {
-                    if (
-                        event.button !== 0 &&
-                        event.pointerType ===
-                        "mouse"
-                    ) {
-                        return;
-                    }
-
+                    if (event.pointerType === "mouse" && event.button !== 0) return;
+                    if (gameStateRef.current !== "playing" || !playerRef.current.grounded) return;
                     event.preventDefault();
-
-                    if (
-                        gameStateRef.current ===
-                        "idle" ||
-                        gameStateRef.current ===
-                        "gameover"
-                    ) {
-                        return;
-                    }
-
                     beginCharge();
                 }}
                 onContextMenu={(event) =>
@@ -1354,8 +1346,53 @@ function JumpGame() {
                                 <span>Jump power</span>
                                 <strong>{chargePercent}%</strong>
                             </div>
-                            <div className="charge-track">
-                                <div className="charge-fill" style={{ width: `${chargeBarPercent}%` }} />
+                            <div
+                                className="charge-track interactive"
+                                role="slider"
+                                aria-label="Jump power"
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={chargePercent}
+                                tabIndex={0}
+                                onPointerDown={(event) => {
+                                    if ((event.pointerType === "mouse" && event.button !== 0) || gameStateRef.current !== "playing" || !playerRef.current.grounded) return;
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    event.currentTarget.setPointerCapture(event.pointerId);
+                                    const bounds = event.currentTarget.getBoundingClientRect();
+                                    const nextCharge = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+                                    chargeExpiredRef.current = false;
+                                    manualChargingRef.current = true;
+                                    chargingRef.current = true;
+                                    chargeRef.current = nextCharge;
+                                    setCharge(nextCharge);
+                                }}
+                                onPointerMove={(event) => {
+                                    if (!manualChargingRef.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                                    event.preventDefault();
+                                    const bounds = event.currentTarget.getBoundingClientRect();
+                                    const nextCharge = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+                                    chargeRef.current = nextCharge;
+                                    setCharge(nextCharge);
+                                }}
+                                onPointerUp={(event) => {
+                                    if (!manualChargingRef.current) return;
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    const bounds = event.currentTarget.getBoundingClientRect();
+                                    const finalCharge = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+                                    chargeRef.current = finalCharge;
+                                    setCharge(finalCharge);
+                                    releaseCharge();
+                                }}
+                                onPointerCancel={() => {
+                                    manualChargingRef.current = false;
+                                    chargingRef.current = false;
+                                    chargeRef.current = 0;
+                                    setCharge(0);
+                                }}
+                            >
+                                <div className="charge-fill" style={{ width: `${chargeBarPercent}%` }}><i className="charge-handle" /></div>
                             </div>
                         </div>
                     )}
@@ -1363,7 +1400,7 @@ function JumpGame() {
 
             <div className="jump-game-instructions">
                 <span>
-                    🖱️ Hold and release
+                    🖱️ Hold stage or drag power
                 </span>
 
                 <span>

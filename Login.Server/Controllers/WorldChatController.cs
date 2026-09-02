@@ -26,9 +26,11 @@ public class WorldChatController(AppDbContext db, IHubContext<ChatHub> hub) : Co
     public async Task<IActionResult> State()
     {
         var setting = await GetSettings();
+        var now = DateTime.UtcNow;
+        var announcements = await db.WorldAnnouncements.AsNoTracking().Where(x => x.ExpiresAt == null || x.ExpiresAt > now).OrderByDescending(x => x.CreatedAt).Select(x => new { x.Id, x.Content, x.CreatedAt, x.ExpiresAt }).ToListAsync();
         var mute = await db.WorldChatMutes.AsNoTracking().FirstOrDefaultAsync(x => x.UserId == UserId && (x.MutedUntil == null || x.MutedUntil > DateTime.UtcNow));
         var blockedIds = await db.UserBlocks.AsNoTracking().Where(x => x.BlockerId == UserId).Select(x => x.BlockedId).ToListAsync();
-        return Ok(new { channels = Channels, setting.Announcement, setting.SlowModeSeconds, onlineCount = ChatHub.OnlineCount, mutedUntil = mute?.MutedUntil, muteReason = mute?.Reason, blockedIds });
+        return Ok(new { channels = Channels, announcement = announcements.FirstOrDefault()?.Content ?? string.Empty, announcements, setting.SlowModeSeconds, onlineCount = ChatHub.OnlineCount, mutedUntil = mute?.MutedUntil, muteReason = mute?.Reason, blockedIds });
     }
 
     [HttpGet("messages")]
@@ -164,6 +166,64 @@ public class WorldChatController(AppDbContext db, IHubContext<ChatHub> hub) : Co
         return Ok(new { setting.Announcement, setting.SlowModeSeconds });
     }
 
+    [HttpGet("admin/announcements")]
+    public async Task<IActionResult> Announcements()
+    {
+        if (!await IsAdmin()) return Forbid();
+        return Ok(await db.WorldAnnouncements.AsNoTracking().OrderByDescending(x => x.CreatedAt).Select(x => new { x.Id, x.Content, x.CreatedAt, x.ExpiresAt, createdBy = x.CreatedBy.Name }).ToListAsync());
+    }
+
+    [HttpPut("admin/slow-mode")]
+    public async Task<IActionResult> SlowMode(SlowModeRequest request)
+    {
+        if (!await IsAdmin()) return Forbid();
+        if (request.Seconds is < 0 or > 120) return BadRequest(new { message = "Slow mode must be between 0 and 120 seconds." });
+        var setting = await GetSettings(); setting.SlowModeSeconds = request.Seconds; setting.UpdatedAt = DateTime.UtcNow; setting.UpdatedById = UserId;
+        await db.SaveChangesAsync();
+        await hub.Clients.All.SendAsync("WorldSettingsChanged", new { announcement = string.Empty, setting.SlowModeSeconds });
+        return Ok(new { setting.SlowModeSeconds });
+    }
+
+    [HttpPost("admin/announcements")]
+    public async Task<IActionResult> CreateAnnouncement(AnnouncementRequest request)
+    {
+        if (!await IsAdmin()) return Forbid();
+        var content = request.Content.Trim();
+        if (content.Length is < 1 or > 1000 || request.ExpiresAt <= DateTime.UtcNow) return BadRequest(new { message = "Enter an announcement and choose a future expiry time." });
+        var row = new WorldAnnouncement { Content = content, ExpiresAt = request.ExpiresAt?.ToUniversalTime(), CreatedById = UserId };
+        db.WorldAnnouncements.Add(row);
+        var userIds = await db.Users.AsNoTracking().Select(x => x.Id).ToListAsync();
+        db.Notifications.AddRange(userIds.Select(userId => new Notification { UserId = userId, Type = "global-announcement", Title = "Global Channel", Body = content, TargetKind = "world", TargetId = 1 }));
+        await db.SaveChangesAsync();
+        var payload = new { row.Id, row.Content, row.CreatedAt, row.ExpiresAt };
+        await hub.Clients.All.SendAsync("WorldAnnouncementsChanged", payload);
+        await hub.Clients.All.SendAsync("NotificationReceived", new { type = "global-announcement", title = "Global Channel", body = content, targetKind = "world", targetId = 1 });
+        return Ok(payload);
+    }
+
+    [HttpPut("admin/announcements/{id:long}")]
+    public async Task<IActionResult> UpdateAnnouncement(long id, AnnouncementRequest request)
+    {
+        if (!await IsAdmin()) return Forbid();
+        var content = request.Content.Trim();
+        if (content.Length is < 1 or > 1000 || request.ExpiresAt <= DateTime.UtcNow) return BadRequest(new { message = "Enter an announcement and choose a future expiry time." });
+        var row = await db.WorldAnnouncements.FindAsync(id); if (row is null) return NotFound();
+        row.Content = content; row.ExpiresAt = request.ExpiresAt?.ToUniversalTime();
+        await db.SaveChangesAsync();
+        await hub.Clients.All.SendAsync("WorldAnnouncementsChanged", new { row.Id, row.Content, row.CreatedAt, row.ExpiresAt });
+        return Ok(new { row.Id, row.Content, row.CreatedAt, row.ExpiresAt });
+    }
+
+    [HttpDelete("admin/announcements/{id:long}")]
+    public async Task<IActionResult> DeleteAnnouncement(long id)
+    {
+        if (!await IsAdmin()) return Forbid();
+        var row = await db.WorldAnnouncements.FindAsync(id); if (row is null) return NotFound();
+        db.WorldAnnouncements.Remove(row); await db.SaveChangesAsync();
+        await hub.Clients.All.SendAsync("WorldAnnouncementsChanged", new { id, deleted = true });
+        return NoContent();
+    }
+
     [HttpPut("admin/mutes/{userId:int}")]
     public async Task<IActionResult> Mute(int userId, MuteRequest request)
     {
@@ -247,6 +307,8 @@ public class WorldChatController(AppDbContext db, IHubContext<ChatHub> hub) : Co
     public record ReactionRequest(string Emoji);
     public record ReportRequest(int ReportedUserId, long? WorldMessageId, string Reason, string Details);
     public record AdminSettingsRequest(string Announcement, int SlowModeSeconds);
+    public record AnnouncementRequest(string Content, DateTime? ExpiresAt);
+    public record SlowModeRequest(int Seconds);
     public record MuteRequest(int Minutes, string Reason);
     public record ReviewRequest(string Status);
     public record AdminPermissionRequest(bool Enabled);

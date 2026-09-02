@@ -11,7 +11,8 @@ type WorldMessage = {
   replyTo?: { id: number; senderId: number; senderName: string; content: string };
   reactions: WorldReaction[]; clientMessageId?: string;
 };
-type WorldState = { channels: string[]; announcement: string; slowModeSeconds: number; onlineCount: number; mutedUntil?: string; muteReason?: string; blockedIds: number[] };
+type WorldAnnouncement = { id: number; content: string; createdAt: string; expiresAt?: string; createdBy?: string };
+type WorldState = { channels: string[]; announcement: string; announcements: WorldAnnouncement[]; slowModeSeconds: number; onlineCount: number; mutedUntil?: string; muteReason?: string; blockedIds: number[] };
 type Report = { id: number; reason: string; details: string; status: string; createdAt: string; worldMessageId?: number; reporterName: string; reportedUserId: number; reportedName: string };
 type AdminUser = { id: number; name: string; isAdmin: boolean; isOwner: boolean; status: string; mustChangePassword: boolean };
 type Props = { me: { id?: number; userId?: number; name: string; isAdmin?: boolean } };
@@ -21,7 +22,7 @@ const emojis = ["👍", "❤️", "😂", "😮", "😢", "🎉"];
 
 export default function WorldChat({ me }: Props) {
   const myId = me.id || me.userId || 0;
-  const [state, setState] = useState<WorldState>({ channels: Object.keys(channelLabels), announcement: "", slowModeSeconds: 5, onlineCount: 0, blockedIds: [] });
+  const [state, setState] = useState<WorldState>({ channels: Object.keys(channelLabels), announcement: "", announcements: [], slowModeSeconds: 5, onlineCount: 0, blockedIds: [] });
   const channel = "general";
   const [messages, setMessages] = useState<WorldMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -35,6 +36,14 @@ export default function WorldChat({ me }: Props) {
   const [adminEnabled, setAdminEnabled] = useState(!!me.isAdmin);
   const [reports, setReports] = useState<Report[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [announcementDraft, setAnnouncementDraft] = useState("");
+  const [slowModeDraft, setSlowModeDraft] = useState(5);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [adminAnnouncements, setAdminAnnouncements] = useState<WorldAnnouncement[]>([]);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<number | null>(null);
+  const [expiryDraft, setExpiryDraft] = useState("");
+  const [clock, setClock] = useState(() => Date.now());
   const connectionRef = useRef<HubConnection | null>(null);
   const channelRef = useRef(channel);
   const listRef = useRef<HTMLDivElement>(null);
@@ -48,6 +57,7 @@ export default function WorldChat({ me }: Props) {
   };
 
   useEffect(() => { void loadState(); }, []);
+  useEffect(() => { const timer = window.setInterval(() => { setClock(Date.now()); void loadState(); }, 30000); return () => window.clearInterval(timer); }, []);
   useEffect(() => {
     channelRef.current = channel;
     setReply(null); setError("");
@@ -65,6 +75,7 @@ export default function WorldChat({ me }: Props) {
     connection.on("WorldReactionsChanged", ({ id, reactions }: { id: number; reactions: WorldReaction[] }) => setMessages((items) => items.map((item) => item.id === id ? { ...item, reactions } : item)));
     connection.on("WorldOnlineCount", ({ count }: { count: number }) => setState((current) => ({ ...current, onlineCount: count })));
     connection.on("WorldSettingsChanged", (settings: { announcement: string; slowModeSeconds: number }) => setState((current) => ({ ...current, ...settings })));
+    connection.on("WorldAnnouncementsChanged", () => { void loadState(); });
     connection.on("WorldMuteChanged", () => void loadState());
     connection.on("AdminPermissionChanged", ({ isAdmin }: { isAdmin: boolean }) => { setAdminEnabled(isAdmin); if (!isAdmin) setAdminOpen(false); });
     connection.onreconnecting(() => { setConnected(false); setError("Global Channel disconnected. Reconnecting…"); });
@@ -119,7 +130,19 @@ export default function WorldChat({ me }: Props) {
       if (myId === 1 || myId === 2) setAdminUsers(await apiRequest<AdminUser[]>("/api/world/owner/admins"));
     }
   };
-  const saveSettings = async () => { const announcement = prompt("Global Channel announcement", state.announcement); if (announcement === null) return; const seconds = Number(prompt("Slow mode in seconds (0–120)", String(state.slowModeSeconds))); const result = await apiRequest<{ announcement: string; slowModeSeconds: number }>("/api/world/admin/settings", { method: "PUT", body: JSON.stringify({ announcement, slowModeSeconds: seconds }) }); setState((current) => ({ ...current, ...result })); };
+  const loadAdminAnnouncements = async () => setAdminAnnouncements(await apiRequest<WorldAnnouncement[]>("/api/world/admin/announcements"));
+  const openSettings = () => { setAnnouncementDraft(""); setEditingAnnouncementId(null); setExpiryDraft(""); setSlowModeDraft(state.slowModeSeconds); setSettingsOpen(true); void loadAdminAnnouncements(); };
+  const editAnnouncement = (item: WorldAnnouncement) => { setEditingAnnouncementId(item.id); setAnnouncementDraft(item.content); setExpiryDraft(item.expiresAt ? new Date(item.expiresAt).toISOString().slice(0, 16) : ""); setSettingsOpen(true); void loadAdminAnnouncements(); };
+  const saveSettings = async () => {
+    setSavingSettings(true); setError("");
+    try {
+      const slow = await apiRequest<{ slowModeSeconds: number }>("/api/world/admin/slow-mode", { method: "PUT", body: JSON.stringify({ seconds: Math.max(0, Math.min(120, slowModeDraft)) }) });
+      if (announcementDraft.trim()) await apiRequest(`/api/world/admin/announcements${editingAnnouncementId ? `/${editingAnnouncementId}` : ""}`, { method: editingAnnouncementId ? "PUT" : "POST", body: JSON.stringify({ content: announcementDraft.trim(), expiresAt: expiryDraft ? new Date(expiryDraft).toISOString() : null }) });
+      setState((current) => ({ ...current, ...slow })); await loadState(); await loadAdminAnnouncements(); setAnnouncementDraft(""); setEditingAnnouncementId(null); setExpiryDraft("");
+    } catch (e) { setError(e instanceof Error ? e.message : "Global Channel settings could not be saved."); }
+    finally { setSavingSettings(false); }
+  };
+  const deleteAnnouncement = async (id: number) => { await apiRequest(`/api/world/admin/announcements/${id}`, { method: "DELETE" }); await loadState(); await loadAdminAnnouncements(); if (editingAnnouncementId === id) { setEditingAnnouncementId(null); setAnnouncementDraft(""); setExpiryDraft(""); } };
   const review = async (item: Report, status: "resolved" | "dismissed") => { await apiRequest(`/api/world/admin/reports/${item.id}`, { method: "PUT", body: JSON.stringify({ status }) }); setReports((items) => items.map((reportItem) => reportItem.id === item.id ? { ...reportItem, status } : reportItem)); };
   const setAdminPermission = async (user: AdminUser) => { const result = await apiRequest<{ id: number; name: string; isAdmin: boolean }>(`/api/world/owner/admins/${user.id}`, { method: "PUT", body: JSON.stringify({ enabled: !user.isAdmin }) }); setAdminUsers((items) => items.map((item) => item.id === result.id ? { ...item, isAdmin: result.isAdmin } : item)); };
   const resetPassword = async (user: AdminUser) => {
@@ -131,10 +154,10 @@ export default function WorldChat({ me }: Props) {
 
   return <section className="world-chat">
     <header className="world-header"><div><span className={connected ? "world-live" : "world-offline"} /> <strong>Global Channel</strong><small>{state.onlineCount} online · available to every account</small></div>{adminEnabled && <button onClick={openAdmin}>🛡 Manage</button>}</header>
-    {state.announcement && <div className="world-announcement"><b>📢 Announcement</b><span>{state.announcement}</span>{adminEnabled && <button onClick={saveSettings}>Edit</button>}</div>}
+    {state.announcements.filter((item) => !item.expiresAt || new Date(item.expiresAt).getTime() > clock).map((item) => <div className="world-announcement" key={item.id}><b>📢 Announcement</b><span>{item.content}{item.expiresAt && <small>Ends {new Date(item.expiresAt).toLocaleString()}</small>}</span>{adminEnabled && <button onClick={() => editAnnouncement(item)}>Edit</button>}</div>)}
     {state.muteReason && <div className="world-muted">🔇 You cannot post right now: {state.muteReason}</div>}
     {error && <div className="world-error">{error}<button onClick={() => setError("")}>×</button></div>}
-    {adminOpen && <aside className="world-admin"><header><strong>Administration</strong><button onClick={saveSettings}>Announcement and slow mode</button></header>{(myId === 1 || myId === 2) && <section className="world-permissions"><h4>User permissions and passwords</h4>{adminUsers.map((user) => <div key={user.id}><span><b>{user.name}</b><small>#{user.id} · {user.isOwner ? "Owner" : user.isAdmin ? "Admin" : "Member"}{user.mustChangePassword ? " · Password change required" : ""}</small></span>{user.isOwner ? <em>Permanent Owner</em> : <div className="world-user-actions"><button onClick={() => setAdminPermission(user)}>{user.isAdmin ? "Remove admin" : "Make admin"}</button><button onClick={() => resetPassword(user)}>Reset password</button></div>}</div>)}</section>}<h4>Report review</h4>{reports.length === 0 ? <p>No reports right now.</p> : reports.map((item) => <article key={item.id}><div><b>{item.reportedName}</b><span>{item.reason} · Reported by {item.reporterName}</span><small>{item.details || "No additional details"}</small></div><em>{item.status}</em>{item.status === "open" && <div><button onClick={() => review(item, "resolved")}>Resolve</button><button onClick={() => review(item, "dismissed")}>Dismiss</button></div>}</article>)}</aside>}
+    {adminOpen && <aside className="world-admin"><header><strong>Administration</strong><button onClick={openSettings}>Announcement and slow mode</button></header>{(myId === 1 || myId === 2) && <section className="world-permissions"><h4>User permissions and passwords</h4>{adminUsers.map((user) => <div key={user.id}><span><b>{user.name}</b><small>#{user.id} · {user.isOwner ? "Owner" : user.isAdmin ? "Admin" : "Member"}{user.mustChangePassword ? " · Password change required" : ""}</small></span>{user.isOwner ? <em>Permanent Owner</em> : <div className="world-user-actions"><button onClick={() => setAdminPermission(user)}>{user.isAdmin ? "Remove admin" : "Make admin"}</button><button onClick={() => resetPassword(user)}>Reset password</button></div>}</div>)}</section>}<h4>Report review</h4>{reports.length === 0 ? <p>No reports right now.</p> : reports.map((item) => <article key={item.id}><div><b>{item.reportedName}</b><span>{item.reason} · Reported by {item.reporterName}</span><small>{item.details || "No additional details"}</small></div><em>{item.status}</em>{item.status === "open" && <div><button onClick={() => review(item, "resolved")}>Resolve</button><button onClick={() => review(item, "dismissed")}>Dismiss</button></div>}</article>)}</aside>}
     <div className="world-message-list" ref={listRef} onScroll={(event) => { const element = event.currentTarget; pinnedRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 30; if (element.scrollTop < 60) void loadOlder(); }}>
       {hasOlder && <button className="world-load-older" onClick={loadOlder} disabled={loadingOlder}>{loadingOlder ? "Loading…" : "Load older messages"}</button>}
       {!messages.length && <div className="world-empty"><span>🌍</span><strong>Start the public conversation</strong><p>Every signed-in Woven user can read and reply here.</p></div>}
@@ -147,6 +170,7 @@ export default function WorldChat({ me }: Props) {
       </article>)}
     </div>
     <div className="world-composer">{reply && <div className="world-replying"><span>Reply to {reply.senderName}: {reply.content}</span><button onClick={() => setReply(null)}>×</button></div>}<button onClick={() => fileRef.current?.click()} disabled={sending}>＋</button><input ref={fileRef} hidden type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(event) => void upload(event.target.files?.[0])} /><textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="Message everyone…" maxLength={2000} disabled={!!state.muteReason} /><button onClick={send} disabled={sending || !draft.trim()} aria-label="Send public message">↑</button></div>
+    {settingsOpen && <div className="world-settings-backdrop" onMouseDown={() => setSettingsOpen(false)}><form className="world-settings-dialog" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); void saveSettings(); }}><header><div><small>GLOBAL CHANNEL</small><h3>Announcement manager</h3></div><button type="button" onClick={() => setSettingsOpen(false)} aria-label="Close">×</button></header><label><span>{editingAnnouncementId ? "Edit announcement" : "New announcement"}</span><textarea value={announcementDraft} onChange={(event) => setAnnouncementDraft(event.target.value)} maxLength={1000} placeholder="Write an announcement for everyone…" /><small>{announcementDraft.length}/1000</small></label><label><span>Expires</span><input type="datetime-local" value={expiryDraft} onChange={(event) => setExpiryDraft(event.target.value)} /><small>Leave empty to keep this announcement until you delete it.</small></label><label><span>Slow mode</span><div className="slow-mode-input"><input type="number" min="0" max="120" value={slowModeDraft} onChange={(event) => setSlowModeDraft(Number(event.target.value))} /><b>seconds</b></div><small>Use 0 to allow messages without a delay.</small></label>{adminAnnouncements.length > 0 && <section className="announcement-manager-list"><h4>All announcements</h4>{adminAnnouncements.map((item) => <article className={item.expiresAt && new Date(item.expiresAt) <= new Date() ? "expired" : ""} key={item.id}><div><strong>{item.content}</strong><small>{item.expiresAt ? `${new Date(item.expiresAt) <= new Date() ? "Expired" : "Ends"} ${new Date(item.expiresAt).toLocaleString()}` : "No expiry"}{item.createdBy ? ` · ${item.createdBy}` : ""}</small></div><button type="button" onClick={() => { setEditingAnnouncementId(item.id); setAnnouncementDraft(item.content); setExpiryDraft(item.expiresAt ? new Date(item.expiresAt).toISOString().slice(0, 16) : ""); }}>Edit</button><button type="button" className="delete" onClick={() => void deleteAnnouncement(item.id)}>Delete</button></article>)}</section>}<footer>{editingAnnouncementId && <button type="button" onClick={() => { setEditingAnnouncementId(null); setAnnouncementDraft(""); setExpiryDraft(""); }}>New</button>}<button type="button" onClick={() => setSettingsOpen(false)}>Close</button><button type="submit" disabled={savingSettings}>{savingSettings ? "Saving…" : editingAnnouncementId ? "Save changes" : announcementDraft.trim() ? "Publish announcement" : "Save slow mode"}</button></footer></form></div>}
   </section>;
 }
 

@@ -25,6 +25,7 @@ public class AppDbContext : DbContext
     public DbSet<UserReport> UserReports { get; set; }
     public DbSet<WorldChatMute> WorldChatMutes { get; set; }
     public DbSet<WorldChatSetting> WorldChatSettings { get; set; }
+    public DbSet<WorldAnnouncement> WorldAnnouncements { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -170,6 +171,13 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Announcement).HasMaxLength(1000);
             entity.HasOne(x => x.UpdatedBy).WithMany().HasForeignKey(x => x.UpdatedById).OnDelete(DeleteBehavior.SetNull);
             entity.HasData(new WorldChatSetting { Id = 1, Announcement = "Welcome to Woven World Chat", SlowModeSeconds = 5, UpdatedAt = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) });
+        });
+
+        modelBuilder.Entity<WorldAnnouncement>(entity =>
+        {
+            entity.Property(x => x.Content).HasMaxLength(1000);
+            entity.HasIndex(x => x.ExpiresAt);
+            entity.HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedById).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

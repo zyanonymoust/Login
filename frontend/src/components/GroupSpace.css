@@ -256,7 +256,11 @@
   background: var(--accent);
 }
 .room-empty {
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
   margin: auto;
+  padding: 28px;
   text-align: center;
 }
 .room-empty > div {
@@ -266,7 +270,11 @@
   font: 700 26px Manrope;
 }
 .room-empty p {
+  max-width: 440px;
+  margin: 0 auto 18px;
   color: var(--muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 .group-details-backdrop { position: absolute; z-index: 25; inset: 0; display: grid; place-items: center; padding: 22px; background: #080a13b8; backdrop-filter: blur(8px); }
 .group-details-modal { width: min(780px, 100%); max-height: calc(100vh - 135px); overflow: auto; border: 1px solid var(--line); border-radius: 22px; color: var(--ink); background: white; box-shadow: 0 30px 90px #0007; }
@@ -440,6 +448,14 @@
   .room-body {
     min-height: 400px;
   }
+  .group-composer { margin: 0 8px 8px; padding: 8px; border: 1px solid var(--line); border-radius: 13px; }
+  .room-empty {
+    max-width: 100%;
+    padding: 24px 20px;
+  }
+  .room-empty > div { font-size: 38px; }
+  .room-empty h2 { margin: 15px auto 9px; font-size: 21px; line-height: 1.25; }
+  .room-empty p { max-width: 300px; margin: 0 auto 16px; font-size: 13px; line-height: 1.5; white-space: normal; }
   .meeting-modal {
     position: fixed;
   }
