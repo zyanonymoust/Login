@@ -33,7 +33,7 @@ const GAME_WIDTH = 900;
 const GAME_HEIGHT = 420;
 const GRAVITY = 1150;
 const MAX_CHARGE_TIME = 1200;
-const MAX_POWER_HOLD_TIME = 2000;
+const MAX_POWER_HOLD_TIME = 1000;
 
 function createStartingPlatforms(): Platform[] {
     const platforms: Platform[] = [
@@ -1006,8 +1006,8 @@ function JumpGame() {
                             );
 
                         const horizontalHit =
-                            horizontalOverlap >
-                            player.width * 0.5;
+                            horizontalOverlap >=
+                            player.width * (2 / 3);
 
                         const verticalHit =
                             previousBottom <=
@@ -1065,9 +1065,7 @@ function JumpGame() {
                                 16;
 
                             const distanceMultiplier =
-                                skippedPlatforms > 0
-                                    ? 2 ** (skippedPlatforms - 1)
-                                    : 1;
+                                2 ** skippedPlatforms;
 
                             const centreMultiplier =
                                 perfect ? 3 : 1;
