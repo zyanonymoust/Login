@@ -740,9 +740,7 @@ function JumpGame() {
             }
         }
 
-        function drawPlayer(
-            animationTime: number
-        ) {
+        function drawPlayer() {
             const player =
                 playerRef.current;
 
@@ -876,38 +874,6 @@ function JumpGame() {
 
             context!.fill();
 
-            if (!player.grounded) {
-                const trailOpacity =
-                    0.32 +
-                    Math.sin(
-                        animationTime / 90
-                    ) *
-                    0.08;
-
-                context!.fillStyle =
-                    `rgba(123, 231, 255, ${trailOpacity})`;
-
-                context!.beginPath();
-
-                context!.ellipse(
-                    playerX -
-                    Math.max(
-                        7,
-                        player.velocityX *
-                        0.035
-                    ),
-                    displayedY +
-                    displayedHeight *
-                    0.65,
-                    20,
-                    7,
-                    0,
-                    0,
-                    Math.PI * 2
-                );
-
-                context!.fill();
-            }
         }
 
         function drawBonus(
@@ -1118,12 +1084,10 @@ function JumpGame() {
                             );
 
                             bonusTextRef.current =
-                                skippedPlatforms > 0
-                                    ? perfect
-                                        ? `SKIP ${skippedPlatforms} · CENTER +${addedScore}`
-                                        : `SKIP ${skippedPlatforms} · +${addedScore}`
-                                    : perfect
-                                        ? `CENTER +${addedScore}`
+                                perfect
+                                    ? `CENTER +${addedScore}`
+                                    : skippedPlatforms > 0
+                                        ? `SKIP +${addedScore}`
                                         : "+1";
 
                             bonusUntilRef.current =
@@ -1200,7 +1164,7 @@ function JumpGame() {
 
             drawBackground(animationTime);
             drawPlatforms();
-            drawPlayer(animationTime);
+            drawPlayer();
             drawBonus(animationTime);
 
             animationRef.current =
