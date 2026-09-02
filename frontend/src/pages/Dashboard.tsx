@@ -97,8 +97,8 @@ export default function Dashboard() {
     [theme, setTheme] = useState(
       () => localStorage.getItem("woven-theme") || "violet",
     ),
-    [fontSize, setFontSize] = useState<"small" | "default" | "large">(
-      () => (localStorage.getItem("woven-font-size") as "small" | "default" | "large") || "default",
+    [fontSize, setFontSize] = useState<"compact" | "small" | "default" | "large" | "extra-large">(
+      () => (localStorage.getItem("woven-font-size") as "compact" | "small" | "default" | "large" | "extra-large") || "default",
     ),
     [darkMode, setDarkMode] = useState(
       () => localStorage.getItem("woven-dark") === "on",
@@ -1036,7 +1036,7 @@ export default function Dashboard() {
             <div className="font-size-setting">
               <div><h3>Text size</h3><p>Make text smaller or larger across Woven.</p></div>
               <div className="font-size-options">
-                {(["small", "default", "large"] as const).map((size) => <button type="button" key={size} className={fontSize === size ? "active" : ""} onClick={() => setFontSize(size)}><b>A</b><span>{size === "default" ? "Default" : size.charAt(0).toUpperCase() + size.slice(1)}</span></button>)}
+                {(["compact", "small", "default", "large", "extra-large"] as const).map((size) => <button type="button" key={size} className={fontSize === size ? "active" : ""} onClick={() => setFontSize(size)}><b>A</b><span>{size === "extra-large" ? "Extra large" : size.charAt(0).toUpperCase() + size.slice(1)}</span></button>)}
               </div>
             </div>
             <div className="background-settings">
@@ -1163,6 +1163,8 @@ function BoredomBreak() {
   const [guessHint, setGuessHint] = useState("");
   const [attempts, setAttempts] = useState(0);
   const [guessCompleted, setGuessCompleted] = useState(false);
+  const [guessHistory, setGuessHistory] = useState<number[]>([]);
+  const [guessBounds, setGuessBounds] = useState({ low: 1, high: 100 });
 
   useEffect(() => () => {
     if (timer.current) window.clearTimeout(timer.current);
@@ -1200,10 +1202,18 @@ function BoredomBreak() {
     }
     const nextAttempts = attempts + 1;
     setAttempts(nextAttempts);
-    if (value < secret) setGuessHint("Too low. Try a higher number.");
-    else if (value > secret) setGuessHint("Too high. Try a lower number.");
+    setGuessHistory((items) => [...items, value]);
+    if (value < secret) {
+      setGuessHint("Too low. Try a higher number.");
+      setGuessBounds((bounds) => ({ ...bounds, low: Math.max(bounds.low, value + 1) }));
+    }
+    else if (value > secret) {
+      setGuessHint("Too high. Try a lower number.");
+      setGuessBounds((bounds) => ({ ...bounds, high: Math.min(bounds.high, value - 1) }));
+    }
     else {
       setGuessHint(`Correct! You found ${secret} in ${nextAttempts} attempts.`);
+      setGuessBounds({ low: secret, high: secret });
       setGuessCompleted(true);
     }
     setGuess("");
@@ -1215,6 +1225,8 @@ function BoredomBreak() {
     setAttempts(0);
     setGuessCompleted(false);
     setGuessHint("");
+    setGuessHistory([]);
+    setGuessBounds({ low: 1, high: 100 });
   };
 
   return (
@@ -1230,6 +1242,11 @@ function BoredomBreak() {
             <div className="guess-range"><span>1</span><div className="range-line"/><span>100</span></div>
             <div className="game-input-row"><input type="number" min="1" max="100" value={guess} disabled={guessCompleted} placeholder="Your guess" onChange={(event) => setGuess(event.target.value)} onKeyDown={(event) => event.key === "Enter" && !guessCompleted && checkGuess()} /><button onMouseDown={(event) => event.preventDefault()} onClick={guessCompleted ? resetGuess : checkGuess}>{guessCompleted ? "New Game" : "Guess"}</button></div>
             {(guessHint || attempts > 0) && <div className={guessCompleted ? "game-message success" : "game-message"}><p>{guessHint}</p>{attempts > 0 && <span>{attempts} {attempts === 1 ? "guess" : "guesses"}</span>}</div>}
+            <div className={`guess-insight ${guessCompleted ? "complete" : ""}`}>
+              <div className="guess-insight-heading"><span>{guessCompleted ? "🏆 Mystery solved" : "🎯 Search zone"}</span><strong>{guessCompleted ? secret : `${guessBounds.low}–${guessBounds.high}`}</strong></div>
+              <div className="guess-window" aria-label={`Current possible range ${guessBounds.low} to ${guessBounds.high}`}><i style={{ left: `${guessBounds.low - 1}%`, width: `${Math.max(2, guessBounds.high - guessBounds.low + 1)}%` }} /></div>
+              {guessHistory.length > 0 ? <div className="guess-trail"><small>Recent guesses</small><div>{guessHistory.slice(-7).map((item, index) => { const distance = Math.abs(secret - item); return <span className={distance <= 5 ? "hot" : distance <= 15 ? "warm" : "cold"} key={`${item}-${index}`}>{item}</span>; })}</div></div> : <div className="guess-starter"><span>① Pick a number</span><span>② Follow the clue</span><span>③ Narrow the range</span></div>}
+            </div>
           </article>
           <article className="reaction-card classic-reaction-card">
           <div className="game-heading"><div className="game-icon">⚡</div><div><h3>Reaction Speed</h3><p>Click when the colour changes.</p></div></div>
