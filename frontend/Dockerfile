@@ -17,7 +17,8 @@ RUN npm run build
 FROM nginx:alpine AS final
 
 ENV BACKEND_URL=http://server:8080
-ENV NGINX_ENVSUBST_FILTER="^(BACKEND_URL|DNS_RESOLVER)$"
+ENV PORT=80
+ENV NGINX_ENVSUBST_FILTER="^(BACKEND_URL|DNS_RESOLVER|PORT)$"
 
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY docker-entrypoint.d/16-railway-resolver.envsh /docker-entrypoint.d/16-railway-resolver.envsh
