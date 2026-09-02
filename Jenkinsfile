@@ -62,6 +62,7 @@ pipeline {
 
     post {
         always {
+            bat returnStatus: true, script: '"%COMPOSE_EXE%" -p login-app logs --tail 120 frontend server'
             bat returnStatus: true, script: '"%COMPOSE_EXE%" -p login-app ps'
             bat returnStatus: true, script: '"%COMPOSE_EXE%" -p login-app down --remove-orphans'
         }
