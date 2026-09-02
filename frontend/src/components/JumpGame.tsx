@@ -786,11 +786,6 @@ function JumpGame() {
                     player.width) /
                 2;
 
-            context!.shadowColor =
-                "rgba(142, 104, 255, 0.8)";
-
-            context!.shadowBlur = 22;
-
             const playerGradient =
                 context!.createLinearGradient(
                     playerX,
@@ -828,8 +823,6 @@ function JumpGame() {
                 playerGradient;
 
             context!.fill();
-
-            context!.shadowBlur = 0;
 
             const eyeY =
                 displayedY +
@@ -1105,12 +1098,17 @@ function JumpGame() {
                                 centreDistance <=
                                 16;
 
-                            const addedScore =
+                            const distanceMultiplier =
                                 skippedPlatforms > 0
-                                    ? skippedPlatforms * 2
-                                    : perfect
-                                        ? 3
-                                        : 1;
+                                    ? 2 ** (skippedPlatforms - 1)
+                                    : 1;
+
+                            const centreMultiplier =
+                                perfect ? 3 : 1;
+
+                            const addedScore =
+                                distanceMultiplier *
+                                centreMultiplier;
 
                             scoreRef.current +=
                                 addedScore;
@@ -1121,10 +1119,12 @@ function JumpGame() {
 
                             bonusTextRef.current =
                                 skippedPlatforms > 0
-                                    ? `SKIP +${addedScore}`
+                                    ? perfect
+                                        ? `SKIP ${skippedPlatforms} · CENTER +${addedScore}`
+                                        : `SKIP ${skippedPlatforms} · +${addedScore}`
                                     : perfect
-                                        ? `PERFECT +${addedScore}`
-                                        : `+${addedScore}`;
+                                        ? `CENTER +${addedScore}`
+                                        : "+1";
 
                             bonusUntilRef.current =
                                 animationTime +
