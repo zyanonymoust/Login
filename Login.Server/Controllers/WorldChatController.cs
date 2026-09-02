@@ -150,9 +150,17 @@ public class WorldChatController(AppDbContext db, IHubContext<ChatHub> hub) : Co
         if (!await IsAdmin()) return Forbid();
         if (request.Announcement.Trim().Length > 1000 || request.SlowModeSeconds is < 0 or > 120) return BadRequest();
         var setting = await GetSettings();
-        setting.Announcement = request.Announcement.Trim(); setting.SlowModeSeconds = request.SlowModeSeconds; setting.UpdatedAt = DateTime.UtcNow; setting.UpdatedById = UserId;
+        var announcement = request.Announcement.Trim();
+        var publishAnnouncement = announcement.Length > 0 && !string.Equals(setting.Announcement, announcement, StringComparison.Ordinal);
+        setting.Announcement = announcement; setting.SlowModeSeconds = request.SlowModeSeconds; setting.UpdatedAt = DateTime.UtcNow; setting.UpdatedById = UserId;
+        if (publishAnnouncement)
+        {
+            var userIds = await db.Users.AsNoTracking().Select(x => x.Id).ToListAsync();
+            db.Notifications.AddRange(userIds.Select(userId => new Notification { UserId = userId, Type = "global-announcement", Title = "Global Channel", Body = announcement, TargetKind = "world", TargetId = 1 }));
+        }
         await db.SaveChangesAsync();
         await hub.Clients.All.SendAsync("WorldSettingsChanged", new { setting.Announcement, setting.SlowModeSeconds });
+        if (publishAnnouncement) await hub.Clients.All.SendAsync("NotificationReceived", new { type = "global-announcement", title = "Global Channel", body = announcement, targetKind = "world", targetId = 1 });
         return Ok(new { setting.Announcement, setting.SlowModeSeconds });
     }
 

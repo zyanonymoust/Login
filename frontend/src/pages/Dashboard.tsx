@@ -51,7 +51,7 @@ type Me = {
   mustChangePassword?: boolean;
 };
 type RecentConversation = { kind: "person" | "group"; id: number; name: string; preview: string; activityAt: string; memberCount: number };
-type AppNotification = { id: number; type: string; title: string; body: string; targetKind: "person" | "group"; targetId: number; count: number; isRead: boolean; createdAt: string };
+type AppNotification = { id: number; type: string; title: string; body: string; targetKind: "person" | "group" | "world"; targetId: number; count: number; isRead: boolean; createdAt: string };
 export type GroupRoom = { id:number; name:string; description:string; isPublic:boolean; status:string; role:string; isMuted:boolean; doNotDisturb:boolean; memberCount:number; invitedBy:string; createdAt:string; unread:number };
 export default function Dashboard() {
   const fileInput = useRef<HTMLInputElement>(null),
@@ -292,7 +292,7 @@ export default function Dashboard() {
     c.on("PasswordResetRequired", () => {
       setMe((current) => ({ ...current, mustChangePassword: true }));
       setView("profile");
-      window.alert("Owner 已重置你的密码。请立即设置新密码。");
+      window.alert("The owner reset your password. Please set a new password now.");
     });
     c.on("NotificationReceived", (item: { title?: string; body?: string; type?: string }) => {
       refreshNotifications();
@@ -340,14 +340,30 @@ export default function Dashboard() {
     incomingRequests = people.filter((x) => x.friendshipStatus === "pending" && x.incoming),
     pendingGroups = groupRooms.filter((x) => x.status === "pending"),
     unread = people.reduce((a, x) => a + x.unread, 0) + groupRooms.reduce((a, x) => a + x.unread, 0),
-    notificationCount = notifications.filter((item) => !item.isRead && (item.type === "friend-request" || item.type === "group-invite")).length,
+    globalAnnouncements = notifications.filter((item) => item.type === "global-announcement"),
+    notificationCount = notifications.filter((item) => !item.isRead && (item.type === "friend-request" || item.type === "group-invite" || item.type === "global-announcement")).length,
     choose = (p: Person) => {
       setSelected(p);
+      localStorage.setItem("woven-last-chat-person", String(p.id));
       setReplyingTo(null);
       setView("chat");
       setMobilePeopleOpen(false);
     },
-    markTargetNotifications = async (targetKind: "person" | "group", targetId: number) => {
+    openMessages = () => {
+      const savedId = Number(localStorage.getItem("woven-last-chat-person"));
+      const recentPersonId = recentConversations.find((item) => item.kind === "person")?.id;
+      const person = selected
+        || (Number.isInteger(savedId) ? people.find((item) => item.id === savedId) : undefined)
+        || (recentPersonId ? people.find((item) => item.id === recentPersonId) : undefined)
+        || friends[0]
+        || others[0];
+      if (person) choose(person);
+      else {
+        setView("chat");
+        setMobilePeopleOpen(true);
+      }
+    },
+    markTargetNotifications = async (targetKind: "person" | "group" | "world", targetId: number) => {
       const matches = notifications.filter((item) => !item.isRead && item.targetKind === targetKind && item.targetId === targetId);
       await Promise.all(matches.map((item) => apiRequest(`/api/notifications/${item.id}/read`, { method: "POST" })));
       setNotifications((items) => items.map((item) => item.targetKind === targetKind && item.targetId === targetId ? { ...item, isRead: true } : item));
@@ -639,14 +655,7 @@ export default function Dashboard() {
           <button
             aria-label="Messages"
             className={view === "chat" ? "active" : ""}
-            onClick={() => {
-              const person = selected || friends[0] || others[0];
-              if (person) choose(person);
-              else {
-                setView("chat");
-                setMobilePeopleOpen(true);
-              }
-            }}
+            onClick={openMessages}
           >
             💬<span>Messages</span>
             {unread > 0 && <b>{unread}</b>}
@@ -771,11 +780,12 @@ export default function Dashboard() {
                     <div><button onClick={() => acceptGroup(room)}>Accept</button><button className="decline" onClick={() => declineGroup(room)}>Decline</button></div>
                   </div>;
                 })}
-                {!incomingRequests.length && !pendingGroups.length && (
+                {globalAnnouncements.map((item) => <button className={`notification-item global-notification ${item.isRead ? "read" : "unread"}`} key={`announcement-${item.id}`} onClick={async () => { if (!item.isRead) await apiRequest(`/api/notifications/${item.id}/read`, { method: "POST" }); setNotifications((items) => items.map((entry) => entry.id === item.id ? { ...entry, isRead: true } : entry)); setNotice(false); setView("world"); }}><span className="notification-kind">Global announcement</span><strong>{item.title}</strong><small>{item.body}</small>{!item.isRead && <i className="request-unread-dot" aria-label="Unread" />}</button>)}
+                {!incomingRequests.length && !pendingGroups.length && !globalAnnouncements.length && (
                   <div className="notification-empty">
                     <i>✓</i>
                     <strong>You're all caught up</strong>
-                    <span>Nothing new right now. New friend requests and group invitations will show up here.</span>
+                    <span>Nothing new right now. Friend requests, group invitations, and Global Channel announcements will appear here.</span>
                   </div>
                 )}
               </div>
@@ -783,7 +793,7 @@ export default function Dashboard() {
           </div>
         </header>
         {(view === "chat" || view === "groups" || view === "world") && <nav className="chat-mode-tabs" aria-label="Chat sections">
-          <button className={view === "chat" ? "active" : ""} onClick={() => { const person = selected || friends[0] || others[0]; if (person) choose(person); else { setView("chat"); setMobilePeopleOpen(true); } }}>💬 Messages</button>
+          <button className={view === "chat" ? "active" : ""} onClick={openMessages}>💬 Messages</button>
           <button className={view === "groups" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}>👥 Group Chat</button>
           <button className={view === "world" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("world"); }}>🌍 Global Channel</button>
         </nav>}
@@ -963,7 +973,7 @@ export default function Dashboard() {
           </section>
         )}
         {view === "profile" && (<section className="profile-page">
-          {me.mustChangePassword && <div className="password-reset-warning"><strong>必须修改密码</strong><span>你目前使用的是临时密码 123456。请在下方立即设置新密码。</span></div>}
+          {me.mustChangePassword && <div className="password-reset-warning"><strong>Password change required</strong><span>You are using the temporary password 123456. Please set a new password below.</span></div>}
           <form className="settings-view" onSubmit={save}>
             <div className="profile-edit">
               <Avatar name={me.name} avatarUrl={me.avatarUrl} />

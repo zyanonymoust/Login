@@ -627,6 +627,7 @@
 .notification-item .notification-kind { color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .notification-item.unread { border-left: 3px solid var(--accent); }
 .notification-item.read { opacity: .7; }
+.global-notification { position: relative; cursor: pointer; }
 .notification-empty { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 28px 14px 20px; color: var(--muted); text-align: center; }
 .notification-empty > i { display: grid; width: 44px; height: 44px; place-items: center; margin-bottom: 3px; border-radius: 50%; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--soft)); font-size: 20px; font-style: normal; font-weight: 900; }
 .notification-empty strong { color: var(--ink); font-size: 16px; }

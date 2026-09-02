@@ -8,7 +8,7 @@ RUN npm ci
 
 COPY . .
 
-ARG VITE_API_URL=http://localhost:8080
+ARG VITE_API_URL=
 
 ENV VITE_API_URL=$VITE_API_URL
 

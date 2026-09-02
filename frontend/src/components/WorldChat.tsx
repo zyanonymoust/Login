@@ -67,13 +67,13 @@ export default function WorldChat({ me }: Props) {
     connection.on("WorldSettingsChanged", (settings: { announcement: string; slowModeSeconds: number }) => setState((current) => ({ ...current, ...settings })));
     connection.on("WorldMuteChanged", () => void loadState());
     connection.on("AdminPermissionChanged", ({ isAdmin }: { isAdmin: boolean }) => { setAdminEnabled(isAdmin); if (!isAdmin) setAdminOpen(false); });
-    connection.onreconnecting(() => { setConnected(false); setError("世界聊天连接中断，正在重新连接…"); });
+    connection.onreconnecting(() => { setConnected(false); setError("Global Channel disconnected. Reconnecting…"); });
     connection.onreconnected(() => { setConnected(true); setError(""); void connection.invoke("JoinWorldChannel", channelRef.current); });
     let stopped = false;
     const start = async () => {
       while (!stopped) {
         try { await connection.start(); connectionRef.current = connection; setConnected(true); setError(""); await connection.invoke("JoinWorldChannel", channelRef.current); return; }
-        catch { setConnected(false); setError("无法连接世界聊天，系统会自动重试。"); await new Promise((resolve) => window.setTimeout(resolve, 5000)); }
+        catch { setConnected(false); setError("Global Channel is unavailable. Woven will retry automatically."); await new Promise((resolve) => window.setTimeout(resolve, 5000)); }
       }
     };
     void start();
@@ -90,27 +90,27 @@ export default function WorldChat({ me }: Props) {
     try {
       const message = await apiRequest<WorldMessage>("/api/world/messages", { method: "POST", body: JSON.stringify({ channel, content, replyToId: reply?.id, clientMessageId: crypto.randomUUID() }) });
       setMessages((items) => items.some((item) => item.id === message.id) ? items : [...items, message]); setDraft(""); setReply(null); pinnedRef.current = true;
-    } catch (e) { setError(e instanceof Error ? e.message : "信息发送失败。"); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Message could not be sent."); }
     finally { setSending(false); }
   };
   const loadOlder = async () => {
     const first = messages[0]; const list = listRef.current; if (!first || !list || loadingOlder || !hasOlder) return;
     const height = list.scrollHeight; setLoadingOlder(true);
     try { const rows = await apiRequest<WorldMessage[]>(`/api/world/messages?channel=${channel}&before=${first.id}&limit=50`); setMessages((items) => [...rows, ...items]); setHasOlder(rows.length === 50); requestAnimationFrame(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight - height; }); }
-    catch (e) { setError(e instanceof Error ? e.message : "无法读取旧信息。"); }
+    catch (e) { setError(e instanceof Error ? e.message : "Older messages could not be loaded."); }
     finally { setLoadingOlder(false); }
   };
   const react = async (message: WorldMessage, emoji: string) => { await apiRequest(`/api/world/messages/${message.id}/reactions`, { method: "POST", body: JSON.stringify({ emoji }) }); };
-  const remove = async (message: WorldMessage) => { if (!confirm("删除这条世界聊天信息？")) return; await apiRequest(`/api/world/messages/${message.id}`, { method: "DELETE" }); setMessages((items) => items.filter((item) => item.id !== message.id)); };
-  const report = async (message: WorldMessage) => { const details = prompt("请说明举报原因", ""); if (details === null) return; await apiRequest("/api/world/reports", { method: "POST", body: JSON.stringify({ reportedUserId: message.senderId, worldMessageId: message.id, reason: "other", details }) }); alert("举报已提交给管理员。"); };
-  const block = async (message: WorldMessage) => { if (!confirm(`屏蔽 ${message.senderName}？`)) return; await apiRequest(`/api/social/blocks/${message.senderId}`, { method: "POST" }); setMessages((items) => items.filter((item) => item.senderId !== message.senderId)); setState((current) => ({ ...current, blockedIds: [...current.blockedIds, message.senderId] })); };
-  const mute = async (message: WorldMessage) => { const value = prompt("禁言分钟数：10、60、1440；输入 -1 为永久，0 为解除", "10"); if (value === null) return; const minutes = Number(value); if (!Number.isInteger(minutes)) return; const reason = prompt("禁言原因", "违反世界聊天规则") || "违反世界聊天规则"; await apiRequest(`/api/world/admin/mutes/${message.senderId}`, { method: "PUT", body: JSON.stringify({ minutes, reason }) }); };
+  const remove = async (message: WorldMessage) => { if (!confirm("Delete this Global Channel message?")) return; await apiRequest(`/api/world/messages/${message.id}`, { method: "DELETE" }); setMessages((items) => items.filter((item) => item.id !== message.id)); };
+  const report = async (message: WorldMessage) => { const details = prompt("Describe why you are reporting this message", ""); if (details === null) return; await apiRequest("/api/world/reports", { method: "POST", body: JSON.stringify({ reportedUserId: message.senderId, worldMessageId: message.id, reason: "other", details }) }); alert("Your report was sent to the administrators."); };
+  const block = async (message: WorldMessage) => { if (!confirm(`Block ${message.senderName}?`)) return; await apiRequest(`/api/social/blocks/${message.senderId}`, { method: "POST" }); setMessages((items) => items.filter((item) => item.senderId !== message.senderId)); setState((current) => ({ ...current, blockedIds: [...current.blockedIds, message.senderId] })); };
+  const mute = async (message: WorldMessage) => { const value = prompt("Mute duration in minutes: 10, 60, or 1440. Use -1 for permanent and 0 to unmute.", "10"); if (value === null) return; const minutes = Number(value); if (!Number.isInteger(minutes)) return; const reason = prompt("Reason for mute", "Global Channel rules violation") || "Global Channel rules violation"; await apiRequest(`/api/world/admin/mutes/${message.senderId}`, { method: "PUT", body: JSON.stringify({ minutes, reason }) }); };
   const upload = async (file?: File) => {
-    if (!file) return; if (file.size > 10_000_000) { setError("文件不能超过 10 MB。"); return; }
+    if (!file) return; if (file.size > 10_000_000) { setError("Files must be 10 MB or smaller."); return; }
     const body = new FormData(); body.append("channel", channel); body.append("file", file); if (draft.trim()) body.append("caption", draft.trim()); if (reply) body.append("replyToId", String(reply.id));
     setSending(true);
-    try { const token = localStorage.getItem("token"); const response = await fetch(`${API_BASE_URL}/api/world/messages/attachment`, { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {}, body }); if (!response.ok) throw new Error((await response.json()).message || "附件发送失败。"); const message = await response.json() as WorldMessage; setMessages((items) => items.some((item) => item.id === message.id) ? items : [...items, message]); setDraft(""); setReply(null); }
-    catch (e) { setError(e instanceof Error ? e.message : "附件发送失败。"); } finally { setSending(false); if (fileRef.current) fileRef.current.value = ""; }
+    try { const token = localStorage.getItem("token"); const response = await fetch(`${API_BASE_URL}/api/world/messages/attachment`, { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {}, body }); if (!response.ok) throw new Error((await response.json()).message || "Attachment could not be sent."); const message = await response.json() as WorldMessage; setMessages((items) => items.some((item) => item.id === message.id) ? items : [...items, message]); setDraft(""); setReply(null); }
+    catch (e) { setError(e instanceof Error ? e.message : "Attachment could not be sent."); } finally { setSending(false); if (fileRef.current) fileRef.current.value = ""; }
   };
   const openAdmin = async () => {
     setAdminOpen((value) => !value);
@@ -119,30 +119,30 @@ export default function WorldChat({ me }: Props) {
       if (myId === 1 || myId === 2) setAdminUsers(await apiRequest<AdminUser[]>("/api/world/owner/admins"));
     }
   };
-  const saveSettings = async () => { const announcement = prompt("世界聊天公告", state.announcement); if (announcement === null) return; const seconds = Number(prompt("慢速模式秒数（0-120）", String(state.slowModeSeconds))); const result = await apiRequest<{ announcement: string; slowModeSeconds: number }>("/api/world/admin/settings", { method: "PUT", body: JSON.stringify({ announcement, slowModeSeconds: seconds }) }); setState((current) => ({ ...current, ...result })); };
+  const saveSettings = async () => { const announcement = prompt("Global Channel announcement", state.announcement); if (announcement === null) return; const seconds = Number(prompt("Slow mode in seconds (0–120)", String(state.slowModeSeconds))); const result = await apiRequest<{ announcement: string; slowModeSeconds: number }>("/api/world/admin/settings", { method: "PUT", body: JSON.stringify({ announcement, slowModeSeconds: seconds }) }); setState((current) => ({ ...current, ...result })); };
   const review = async (item: Report, status: "resolved" | "dismissed") => { await apiRequest(`/api/world/admin/reports/${item.id}`, { method: "PUT", body: JSON.stringify({ status }) }); setReports((items) => items.map((reportItem) => reportItem.id === item.id ? { ...reportItem, status } : reportItem)); };
   const setAdminPermission = async (user: AdminUser) => { const result = await apiRequest<{ id: number; name: string; isAdmin: boolean }>(`/api/world/owner/admins/${user.id}`, { method: "PUT", body: JSON.stringify({ enabled: !user.isAdmin }) }); setAdminUsers((items) => items.map((item) => item.id === result.id ? { ...item, isAdmin: result.isAdmin } : item)); };
   const resetPassword = async (user: AdminUser) => {
-    if (!confirm(`确定要把 ${user.name} 的密码重置为临时密码 123456 吗？`)) return;
+    if (!confirm(`Reset ${user.name}'s password to the temporary password 123456?`)) return;
     const result = await apiRequest<{ id: number; name: string; temporaryPassword: string; mustChangePassword: boolean }>(`/api/world/owner/users/${user.id}/reset-password`, { method: "PUT" });
     setAdminUsers((items) => items.map((item) => item.id === result.id ? { ...item, mustChangePassword: result.mustChangePassword } : item));
-    alert(`${result.name} 的临时密码是 ${result.temporaryPassword}。该用户登录后必须修改密码。`);
+    alert(`${result.name}'s temporary password is ${result.temporaryPassword}. They must change it after signing in.`);
   };
 
   return <section className="world-chat">
     <header className="world-header"><div><span className={connected ? "world-live" : "world-offline"} /> <strong>Global Channel</strong><small>{state.onlineCount} online · available to every account</small></div>{adminEnabled && <button onClick={openAdmin}>🛡 Manage</button>}</header>
-    {state.announcement && <div className="world-announcement"><b>📢 公告</b><span>{state.announcement}</span>{me.isAdmin && <button onClick={saveSettings}>编辑</button>}</div>}
-    {state.muteReason && <div className="world-muted">🔇 你目前无法发言：{state.muteReason}</div>}
+    {state.announcement && <div className="world-announcement"><b>📢 Announcement</b><span>{state.announcement}</span>{adminEnabled && <button onClick={saveSettings}>Edit</button>}</div>}
+    {state.muteReason && <div className="world-muted">🔇 You cannot post right now: {state.muteReason}</div>}
     {error && <div className="world-error">{error}<button onClick={() => setError("")}>×</button></div>}
-    {adminOpen && <aside className="world-admin"><header><strong>管理员中心</strong><button onClick={saveSettings}>公告与慢速模式</button></header>{(myId === 1 || myId === 2) && <section className="world-permissions"><h4>用户权限与密码</h4>{adminUsers.map((user) => <div key={user.id}><span><b>{user.name}</b><small>#{user.id} · {user.isOwner ? "Owner" : user.isAdmin ? "Admin" : "Member"}{user.mustChangePassword ? " · 等待修改密码" : ""}</small></span>{user.isOwner ? <em>永久 Owner</em> : <div className="world-user-actions"><button onClick={() => setAdminPermission(user)}>{user.isAdmin ? "取消管理员" : "设为管理员"}</button><button onClick={() => resetPassword(user)}>重置密码</button></div>}</div>)}</section>}<h4>举报审核</h4>{reports.length === 0 ? <p>目前没有举报。</p> : reports.map((item) => <article key={item.id}><div><b>{item.reportedName}</b><span>{item.reason} · 举报人 {item.reporterName}</span><small>{item.details || "没有补充说明"}</small></div><em>{item.status}</em>{item.status === "open" && <div><button onClick={() => review(item, "resolved")}>处理完成</button><button onClick={() => review(item, "dismissed")}>忽略</button></div>}</article>)}</aside>}
+    {adminOpen && <aside className="world-admin"><header><strong>Administration</strong><button onClick={saveSettings}>Announcement and slow mode</button></header>{(myId === 1 || myId === 2) && <section className="world-permissions"><h4>User permissions and passwords</h4>{adminUsers.map((user) => <div key={user.id}><span><b>{user.name}</b><small>#{user.id} · {user.isOwner ? "Owner" : user.isAdmin ? "Admin" : "Member"}{user.mustChangePassword ? " · Password change required" : ""}</small></span>{user.isOwner ? <em>Permanent Owner</em> : <div className="world-user-actions"><button onClick={() => setAdminPermission(user)}>{user.isAdmin ? "Remove admin" : "Make admin"}</button><button onClick={() => resetPassword(user)}>Reset password</button></div>}</div>)}</section>}<h4>Report review</h4>{reports.length === 0 ? <p>No reports right now.</p> : reports.map((item) => <article key={item.id}><div><b>{item.reportedName}</b><span>{item.reason} · Reported by {item.reporterName}</span><small>{item.details || "No additional details"}</small></div><em>{item.status}</em>{item.status === "open" && <div><button onClick={() => review(item, "resolved")}>Resolve</button><button onClick={() => review(item, "dismissed")}>Dismiss</button></div>}</article>)}</aside>}
     <div className="world-message-list" ref={listRef} onScroll={(event) => { const element = event.currentTarget; pinnedRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 30; if (element.scrollTop < 60) void loadOlder(); }}>
-      {hasOlder && <button className="world-load-older" onClick={loadOlder} disabled={loadingOlder}>{loadingOlder ? "读取中…" : "读取更早信息"}</button>}
+      {hasOlder && <button className="world-load-older" onClick={loadOlder} disabled={loadingOlder}>{loadingOlder ? "Loading…" : "Load older messages"}</button>}
       {!messages.length && <div className="world-empty"><span>🌍</span><strong>Start the public conversation</strong><p>Every signed-in Woven user can read and reply here.</p></div>}
       {messages.map((message) => <article className={`world-message ${message.senderId === myId ? "mine" : ""}`} key={message.id}>
         <div className="world-avatar">{message.senderAvatarUrl ? <img src={`${API_BASE_URL}${message.senderAvatarUrl}`} alt="" /> : message.senderName.charAt(0).toUpperCase()}</div>
         <div className="world-message-body"><header><strong>{message.senderName}</strong>{message.isAdmin && <b>ADMIN</b>}<time>{new Date(message.sentAt).toLocaleString()}</time></header>{message.replyTo && <div className="world-reply"><b>{message.replyTo.senderName}</b>{message.replyTo.content}</div>}<p>{message.content}</p>{message.attachmentUrl && <WorldAttachment message={message} />}
           <div className="world-reactions">{message.reactions.map((reaction) => <button key={reaction.emoji} onClick={() => react(message, reaction.emoji)}>{reaction.emoji} {reaction.count}</button>)}</div>
-          <footer><button onClick={() => setReply(message)}>回复</button>{emojis.slice(0, 3).map((emoji) => <button key={emoji} onClick={() => react(message, emoji)}>{emoji}</button>)}{message.senderId !== myId && <><button onClick={() => report(message)}>举报</button><button onClick={() => block(message)}>屏蔽</button></>}{adminEnabled && message.senderId > 2 && <button onClick={() => mute(message)}>禁言</button>}{(message.senderId === myId || adminEnabled) && <button onClick={() => remove(message)}>删除</button>}</footer>
+          <footer><button onClick={() => setReply(message)}>Reply</button>{emojis.slice(0, 3).map((emoji) => <button key={emoji} onClick={() => react(message, emoji)}>{emoji}</button>)}{message.senderId !== myId && <><button onClick={() => report(message)}>Report</button><button onClick={() => block(message)}>Block</button></>}{adminEnabled && message.senderId > 2 && <button onClick={() => mute(message)}>Mute</button>}{(message.senderId === myId || adminEnabled) && <button onClick={() => remove(message)}>Delete</button>}</footer>
         </div>
       </article>)}
     </div>
@@ -153,7 +153,7 @@ export default function WorldChat({ me }: Props) {
 function WorldAttachment({ message }: { message: WorldMessage }) {
   const [url, setUrl] = useState("");
   useEffect(() => { let objectUrl = ""; const token = localStorage.getItem("token"); fetch(`${API_BASE_URL}${message.attachmentUrl}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }).then((response) => response.ok ? response.blob() : Promise.reject()).then((blob) => { objectUrl = URL.createObjectURL(blob); setUrl(objectUrl); }).catch(() => undefined); return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); }; }, [message.attachmentUrl]);
-  if (!url) return <span className="world-file">正在读取附件…</span>;
-  if (message.attachmentContentType?.startsWith("image/")) return <a className="world-image" href={url} target="_blank" rel="noreferrer"><img src={url} alt={message.attachmentName || "世界聊天图片"} /></a>;
+  if (!url) return <span className="world-file">Loading attachment…</span>;
+  if (message.attachmentContentType?.startsWith("image/")) return <a className="world-image" href={url} target="_blank" rel="noreferrer"><img src={url} alt={message.attachmentName || "Global Channel image"} /></a>;
   return <a className="world-file" href={url} download={message.attachmentName}>📎 {message.attachmentName}</a>;
 }
