@@ -19,6 +19,7 @@ FROM nginx:alpine AS final
 ENV BACKEND_URL=http://server:8080
 
 COPY nginx.conf /etc/nginx/templates/default.conf.template
+COPY docker-entrypoint.d/16-railway-resolver.envsh /docker-entrypoint.d/16-railway-resolver.envsh
 
 COPY --from=build /app/dist /usr/share/nginx/html
 
