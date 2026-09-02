@@ -792,11 +792,6 @@ export default function Dashboard() {
             )}
           </div>
         </header>
-        {(view === "chat" || view === "groups" || view === "world") && <nav className="chat-mode-tabs" aria-label="Chat sections">
-          <button className={view === "chat" ? "active" : ""} onClick={openMessages}>💬 Messages</button>
-          <button className={view === "groups" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("groups"); }}>👥 Group Chat</button>
-          <button className={view === "world" ? "active" : ""} onClick={() => { setMobilePeopleOpen(false); setView("world"); }}>🌍 Global Channel</button>
-        </nav>}
         {view === "home" && (
           <section className="home-view">
             <div className="welcome-block">
@@ -1240,7 +1235,7 @@ function BoredomBreak() {
           <article className="guess-card classic-guess-card">
             <div className="game-heading"><div className="game-icon">🔢</div><div><h3>Guess the Number</h3><p>Find the hidden number from 1 to 100.</p></div></div>
             <div className="guess-range"><span>1</span><div className="range-line"/><span>100</span></div>
-            <div className="game-input-row"><input type="number" min="1" max="100" value={guess} disabled={guessCompleted} placeholder="Your guess" onChange={(event) => setGuess(event.target.value)} onKeyDown={(event) => event.key === "Enter" && !guessCompleted && checkGuess()} /><button onMouseDown={(event) => event.preventDefault()} onClick={guessCompleted ? resetGuess : checkGuess}>{guessCompleted ? "New Game" : "Guess"}</button></div>
+            <div className={`game-input-row ${guessCompleted ? "game-completed" : ""}`}><input type="number" min="1" max="100" value={guess} disabled={guessCompleted} placeholder="Your guess" onChange={(event) => setGuess(event.target.value)} onKeyDown={(event) => event.key === "Enter" && !guessCompleted && checkGuess()} /><button onMouseDown={(event) => event.preventDefault()} onClick={guessCompleted ? resetGuess : checkGuess}>{guessCompleted ? "New Game" : "Guess"}</button></div>
             {(guessHint || attempts > 0) && <div className={guessCompleted ? "game-message success" : "game-message"}><p>{guessHint}</p>{attempts > 0 && <span>{attempts} {attempts === 1 ? "guess" : "guesses"}</span>}</div>}
             <div className={`guess-insight ${guessCompleted ? "complete" : ""}`}>
               <div className="guess-insight-heading"><span>{guessCompleted ? "🏆 Mystery solved" : "🎯 Search zone"}</span><strong>{guessCompleted ? secret : `${guessBounds.low}–${guessBounds.high}`}</strong></div>

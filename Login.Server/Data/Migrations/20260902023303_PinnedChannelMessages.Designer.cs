@@ -3,6 +3,7 @@ using System;
 using Login.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Login.Server.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260902023303_PinnedChannelMessages")]
+    partial class PinnedChannelMessages
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -149,9 +152,6 @@ namespace Login.Server.Data.Migrations
 
                     b.Property<bool>("IsPinned")
                         .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("PinnedUntil")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("SenderId")
                         .HasColumnType("integer");
@@ -436,9 +436,6 @@ namespace Login.Server.Data.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<bool>("WorldChatDoNotDisturb")
-                        .HasColumnType("boolean");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
@@ -655,9 +652,6 @@ namespace Login.Server.Data.Migrations
 
                     b.Property<bool>("IsPinned")
                         .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("PinnedUntil")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long?>("ReplyToId")
                         .HasColumnType("bigint");

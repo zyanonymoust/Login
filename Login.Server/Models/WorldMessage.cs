@@ -7,6 +7,8 @@ public class WorldMessage
     public string Channel { get; set; } = "general";
     public string Content { get; set; } = string.Empty;
     public DateTime SentAt { get; set; } = DateTime.UtcNow;
+    public bool IsPinned { get; set; }
+    public DateTime? PinnedUntil { get; set; }
     public long? ReplyToId { get; set; }
     public string? AttachmentName { get; set; }
     public string? AttachmentContentType { get; set; }

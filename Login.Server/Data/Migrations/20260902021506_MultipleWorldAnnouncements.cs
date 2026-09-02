@@ -46,9 +46,15 @@ namespace Login.Server.Data.Migrations
 
             migrationBuilder.Sql("""
                 INSERT INTO "WorldAnnouncements" ("Content", "CreatedAt", "ExpiresAt", "CreatedById")
-                SELECT "Announcement", "UpdatedAt", NULL, COALESCE("UpdatedById", 1)
-                FROM "WorldChatSettings"
-                WHERE "Id" = 1 AND LENGTH(TRIM("Announcement")) > 0;
+                SELECT settings."Announcement", settings."UpdatedAt", NULL,
+                       COALESCE(
+                           (SELECT users."Id" FROM "Users" users WHERE users."Id" = settings."UpdatedById"),
+                           (SELECT users."Id" FROM "Users" users ORDER BY users."Id" LIMIT 1)
+                       )
+                FROM "WorldChatSettings" settings
+                WHERE settings."Id" = 1
+                  AND LENGTH(TRIM(settings."Announcement")) > 0
+                  AND EXISTS (SELECT 1 FROM "Users");
                 """);
         }
 

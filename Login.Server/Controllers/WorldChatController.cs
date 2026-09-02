@@ -30,7 +30,16 @@ public class WorldChatController(AppDbContext db, IHubContext<ChatHub> hub) : Co
         var announcements = await db.WorldAnnouncements.AsNoTracking().Where(x => x.ExpiresAt == null || x.ExpiresAt > now).OrderByDescending(x => x.CreatedAt).Select(x => new { x.Id, x.Content, x.CreatedAt, x.ExpiresAt }).ToListAsync();
         var mute = await db.WorldChatMutes.AsNoTracking().FirstOrDefaultAsync(x => x.UserId == UserId && (x.MutedUntil == null || x.MutedUntil > DateTime.UtcNow));
         var blockedIds = await db.UserBlocks.AsNoTracking().Where(x => x.BlockerId == UserId).Select(x => x.BlockedId).ToListAsync();
-        return Ok(new { channels = Channels, announcement = announcements.FirstOrDefault()?.Content ?? string.Empty, announcements, setting.SlowModeSeconds, onlineCount = ChatHub.OnlineCount, mutedUntil = mute?.MutedUntil, muteReason = mute?.Reason, blockedIds });
+        var worldChatDoNotDisturb = await db.Users.AsNoTracking().Where(x => x.Id == UserId).Select(x => x.WorldChatDoNotDisturb).SingleAsync();
+        return Ok(new { channels = Channels, announcement = announcements.FirstOrDefault()?.Content ?? string.Empty, announcements, setting.SlowModeSeconds, onlineCount = ChatHub.OnlineCount, mutedUntil = mute?.MutedUntil, muteReason = mute?.Reason, blockedIds, worldChatDoNotDisturb });
+    }
+
+    [HttpPut("dnd")]
+    public async Task<IActionResult> DoNotDisturb(DoNotDisturbRequest request)
+    {
+        var user = await db.Users.FindAsync(UserId); if (user is null) return NotFound();
+        user.WorldChatDoNotDisturb = request.Enabled; await db.SaveChangesAsync();
+        return Ok(new { enabled = user.WorldChatDoNotDisturb });
     }
 
     [HttpGet("messages")]
@@ -44,7 +53,7 @@ public class WorldChatController(AppDbContext db, IHubContext<ChatHub> hub) : Co
         var rows = await query.OrderByDescending(x => x.Id).Take(limit).Select(x => new
         {
             x.Id, x.SenderId, senderName = x.Sender.Name, senderAvatarUrl = x.Sender.AvatarData != null ? $"/api/social/avatar/{x.SenderId}" : null,
-            x.Channel, x.Content, x.SentAt, isAdmin = x.Sender.IsAdmin, x.AttachmentName, x.AttachmentContentType, attachmentUrl = x.AttachmentData != null ? $"/api/world/messages/{x.Id}/attachment" : null,
+            x.Channel, x.Content, x.SentAt, isPinned = x.IsPinned && (x.PinnedUntil == null || x.PinnedUntil > DateTime.UtcNow), x.PinnedUntil, isAdmin = x.Sender.IsAdmin, x.AttachmentName, x.AttachmentContentType, attachmentUrl = x.AttachmentData != null ? $"/api/world/messages/{x.Id}/attachment" : null,
             replyTo = x.ReplyTo == null ? null : new { x.ReplyTo.Id, x.ReplyTo.SenderId, senderName = x.ReplyTo.Sender.Name, x.ReplyTo.Content },
             reactions = x.Reactions.GroupBy(r => r.Emoji).Select(g => new { emoji = g.Key, count = g.Count(), reactedByMe = g.Any(r => r.UserId == UserId) })
         }).ToListAsync();
@@ -132,6 +141,19 @@ public class WorldChatController(AppDbContext db, IHubContext<ChatHub> hub) : Co
         return NoContent();
     }
 
+    [HttpPut("messages/{messageId:long}/pin")]
+    public async Task<IActionResult> Pin(long messageId, PinRequest request)
+    {
+        if (!await IsAdmin()) return Forbid();
+        var row = await db.WorldMessages.FindAsync(messageId); if (row is null) return NotFound();
+        if (request.Days is not (0 or 1 or 7 or 30)) return BadRequest(new { message = "Choose 1 day, 1 week, or 1 month." });
+        row.IsPinned = request.Days > 0;
+        row.PinnedUntil = request.Days > 0 ? DateTime.UtcNow.AddDays(request.Days) : null;
+        await db.SaveChangesAsync();
+        await hub.Clients.Group(ChatHub.WorldGroup(row.Channel)).SendAsync("WorldMessagePinned", new { id = row.Id, isPinned = row.IsPinned, row.PinnedUntil });
+        return Ok(new { row.Id, row.IsPinned, row.PinnedUntil });
+    }
+
     [HttpPost("reports")]
     public async Task<IActionResult> Report(ReportRequest request)
     {
@@ -157,12 +179,12 @@ public class WorldChatController(AppDbContext db, IHubContext<ChatHub> hub) : Co
         setting.Announcement = announcement; setting.SlowModeSeconds = request.SlowModeSeconds; setting.UpdatedAt = DateTime.UtcNow; setting.UpdatedById = UserId;
         if (publishAnnouncement)
         {
-            var userIds = await db.Users.AsNoTracking().Select(x => x.Id).ToListAsync();
+            var userIds = await db.Users.AsNoTracking().Where(x => !x.WorldChatDoNotDisturb).Select(x => x.Id).ToListAsync();
             db.Notifications.AddRange(userIds.Select(userId => new Notification { UserId = userId, Type = "global-announcement", Title = "Global Channel", Body = announcement, TargetKind = "world", TargetId = 1 }));
         }
         await db.SaveChangesAsync();
         await hub.Clients.All.SendAsync("WorldSettingsChanged", new { setting.Announcement, setting.SlowModeSeconds });
-        if (publishAnnouncement) await hub.Clients.All.SendAsync("NotificationReceived", new { type = "global-announcement", title = "Global Channel", body = announcement, targetKind = "world", targetId = 1 });
+        if (publishAnnouncement) await SendAnnouncementNotification("Global Channel", announcement);
         return Ok(new { setting.Announcement, setting.SlowModeSeconds });
     }
 
@@ -192,12 +214,12 @@ public class WorldChatController(AppDbContext db, IHubContext<ChatHub> hub) : Co
         if (content.Length is < 1 or > 1000 || request.ExpiresAt <= DateTime.UtcNow) return BadRequest(new { message = "Enter an announcement and choose a future expiry time." });
         var row = new WorldAnnouncement { Content = content, ExpiresAt = request.ExpiresAt?.ToUniversalTime(), CreatedById = UserId };
         db.WorldAnnouncements.Add(row);
-        var userIds = await db.Users.AsNoTracking().Select(x => x.Id).ToListAsync();
+        var userIds = await db.Users.AsNoTracking().Where(x => !x.WorldChatDoNotDisturb).Select(x => x.Id).ToListAsync();
         db.Notifications.AddRange(userIds.Select(userId => new Notification { UserId = userId, Type = "global-announcement", Title = "Global Channel", Body = content, TargetKind = "world", TargetId = 1 }));
         await db.SaveChangesAsync();
         var payload = new { row.Id, row.Content, row.CreatedAt, row.ExpiresAt };
         await hub.Clients.All.SendAsync("WorldAnnouncementsChanged", payload);
-        await hub.Clients.All.SendAsync("NotificationReceived", new { type = "global-announcement", title = "Global Channel", body = content, targetKind = "world", targetId = 1 });
+        await SendAnnouncementNotification("Global Channel", content);
         return Ok(payload);
     }
 
@@ -209,8 +231,11 @@ public class WorldChatController(AppDbContext db, IHubContext<ChatHub> hub) : Co
         if (content.Length is < 1 or > 1000 || request.ExpiresAt <= DateTime.UtcNow) return BadRequest(new { message = "Enter an announcement and choose a future expiry time." });
         var row = await db.WorldAnnouncements.FindAsync(id); if (row is null) return NotFound();
         row.Content = content; row.ExpiresAt = request.ExpiresAt?.ToUniversalTime();
+        var userIds = await db.Users.AsNoTracking().Where(x => !x.WorldChatDoNotDisturb).Select(x => x.Id).ToListAsync();
+        db.Notifications.AddRange(userIds.Select(userId => new Notification { UserId = userId, Type = "global-announcement", Title = "Global Channel updated", Body = content, TargetKind = "world", TargetId = 1 }));
         await db.SaveChangesAsync();
         await hub.Clients.All.SendAsync("WorldAnnouncementsChanged", new { row.Id, row.Content, row.CreatedAt, row.ExpiresAt });
+        await SendAnnouncementNotification("Global Channel updated", content);
         return Ok(new { row.Id, row.Content, row.CreatedAt, row.ExpiresAt });
     }
 
@@ -303,11 +328,19 @@ public class WorldChatController(AppDbContext db, IHubContext<ChatHub> hub) : Co
         await db.SaveChangesAsync();
         return setting;
     }
+
+    private async Task SendAnnouncementNotification(string title, string body)
+    {
+        var userIds = await db.Users.AsNoTracking().Where(x => !x.WorldChatDoNotDisturb).Select(x => x.Id).ToListAsync();
+        await Task.WhenAll(userIds.Select(userId => hub.Clients.Group(ChatHub.UserGroup(userId)).SendAsync("NotificationReceived", new { type = "global-announcement", title, body, targetKind = "world", targetId = 1 })));
+    }
     public record WorldMessageRequest(string Channel, string Content, long? ReplyToId = null, string? ClientMessageId = null);
+    public record PinRequest(int Days);
     public record ReactionRequest(string Emoji);
     public record ReportRequest(int ReportedUserId, long? WorldMessageId, string Reason, string Details);
     public record AdminSettingsRequest(string Announcement, int SlowModeSeconds);
     public record AnnouncementRequest(string Content, DateTime? ExpiresAt);
+    public record DoNotDisturbRequest(bool Enabled);
     public record SlowModeRequest(int Seconds);
     public record MuteRequest(int Minutes, string Reason);
     public record ReviewRequest(string Status);

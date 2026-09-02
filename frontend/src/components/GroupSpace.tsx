@@ -14,6 +14,8 @@ type GroupMessage = {
   senderName: string;
   content: string;
   sentAt: string;
+  isPinned?: boolean;
+  pinnedUntil?: string;
 };
 type Member = {
   userId: number;
@@ -53,7 +55,10 @@ export default function GroupSpace({
     [detailDescription, setDetailDescription] = useState(""),
     [savingDetails, setSavingDetails] = useState(false),
     [connection, setConnection] = useState<HubConnection | null>(null),
-    [meeting, setMeeting] = useState(false);
+    [meeting, setMeeting] = useState(false),
+    [pinMenuId, setPinMenuId] = useState<number | null>(null),
+    [pinNow, setPinNow] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setPinNow(Date.now()), 30000); return () => window.clearInterval(timer); }, []);
   const accepted = rooms.filter((x) => x.status === "accepted"),
     pending = rooms.filter((x) => x.status === "pending"),
     publicRooms = rooms.filter((x) => x.status === "available");
@@ -89,6 +94,7 @@ export default function GroupSpace({
           : x,
       ),
     );
+    c.on("GroupMessagePinned", ({ id, groupRoomId, isPinned, pinnedUntil }: { id: number; groupRoomId: number; isPinned: boolean; pinnedUntil?: string }) => setMessages((items) => groupRoomId === active?.id ? items.map((item) => item.id === id ? { ...item, isPinned, pinnedUntil } : item) : items));
     c.start()
       .then(() => setConnection(c))
       .catch(() => {});
@@ -127,6 +133,11 @@ export default function GroupSpace({
         const m = await apiRequest<GroupMessage>(`/api/groups/${active.id}/messages`, { method: "POST", body: JSON.stringify({ content }) });
         setMessages((x) => (x.some((y) => y.id === m.id) ? x : [...x, m]));
       } catch (error) { window.alert(error instanceof Error ? error.message : "Message could not be sent."); }
+    },
+    pinMessage = async (message: GroupMessage, days: 0 | 1 | 7 | 30) => {
+      if (!active) return;
+      const result = await apiRequest<{ id: number; isPinned: boolean; pinnedUntil?: string }>(`/api/groups/${active.id}/messages/${message.id}/pin`, { method: "PUT", body: JSON.stringify({ days }) });
+      setMessages((items) => items.map((item) => item.id === result.id ? { ...item, isPinned: result.isPinned, pinnedUntil: result.pinnedUntil } : item)); setPinMenuId(null);
     },
     invite = async (userId: number) => {
       if (!active) return;
@@ -294,8 +305,10 @@ export default function GroupSpace({
             </header>
             <div className="room-body">
               <div className="group-messages">
+                {messages.some((message) => message.isPinned && (!message.pinnedUntil || new Date(message.pinnedUntil).getTime() > pinNow)) && <div className="group-pinned"><b>📌 Pinned</b>{messages.filter((message) => message.isPinned && (!message.pinnedUntil || new Date(message.pinnedUntil).getTime() > pinNow)).slice(-3).reverse().map((message) => <button key={message.id} onClick={() => document.getElementById(`group-message-${message.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}>{message.senderName}: {message.content}<small>{message.pinnedUntil ? `Until ${new Date(message.pinnedUntil).toLocaleDateString()}` : ""}</small></button>)}</div>}
                 {messages.map((m) => (
                   <div
+                    id={`group-message-${m.id}`}
                     className={
                       m.senderId === (me.id || me.userId)
                         ? "group-message mine"
@@ -311,6 +324,7 @@ export default function GroupSpace({
                         minute: "2-digit",
                       })}
                     </time>
+                    {(active.role === "owner" || active.role === "admin") && <span className="pin-duration-wrap"><button className="pin-group-message" onClick={() => m.isPinned ? void pinMessage(m, 0) : setPinMenuId(pinMenuId === m.id ? null : m.id)}>{m.isPinned ? "Unpin" : "Pin"}</button>{pinMenuId === m.id && <span className="pin-duration-menu"><button onClick={() => void pinMessage(m, 1)}>1 day</button><button onClick={() => void pinMessage(m, 7)}>1 week</button><button onClick={() => void pinMessage(m, 30)}>1 month</button></span>}</span>}
                   </div>
                 ))}
               </div>

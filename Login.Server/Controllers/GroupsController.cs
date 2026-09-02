@@ -99,9 +99,22 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     public async Task<IActionResult> Messages(int roomId)
     {
         if (!await IsAccepted(roomId, UserId)) return Forbid();
-        var messages = await db.GroupMessages.AsNoTracking().Where(x => x.GroupRoomId == roomId).OrderBy(x => x.Id).Take(300).Select(x => new { x.Id, x.GroupRoomId, x.SenderId, senderName = x.Sender.Name, x.Content, x.SentAt }).ToListAsync();
+        var messages = await db.GroupMessages.AsNoTracking().Where(x => x.GroupRoomId == roomId).OrderBy(x => x.Id).Take(300).Select(x => new { x.Id, x.GroupRoomId, x.SenderId, senderName = x.Sender.Name, x.Content, x.SentAt, isPinned = x.IsPinned && (x.PinnedUntil == null || x.PinnedUntil > DateTime.UtcNow), x.PinnedUntil }).ToListAsync();
         await db.Notifications.Where(x => x.UserId == UserId && x.Type == "group-message" && x.TargetKind == "group" && x.TargetId == roomId && !x.IsRead).ExecuteUpdateAsync(x => x.SetProperty(n => n.IsRead, true));
         return Ok(messages);
+    }
+
+    [HttpPut("{roomId:int}/messages/{messageId:long}/pin")]
+    public async Task<IActionResult> PinMessage(int roomId, long messageId, PinMessageRequest request)
+    {
+        if (!await db.GroupMembers.AnyAsync(x => x.GroupRoomId == roomId && x.UserId == UserId && x.Status == "accepted" && (x.Role == "owner" || x.Role == "admin"))) return Forbid();
+        var row = await db.GroupMessages.FirstOrDefaultAsync(x => x.Id == messageId && x.GroupRoomId == roomId); if (row is null) return NotFound();
+        if (request.Days is not (0 or 1 or 7 or 30)) return BadRequest(new { message = "Choose 1 day, 1 week, or 1 month." });
+        row.IsPinned = request.Days > 0;
+        row.PinnedUntil = request.Days > 0 ? DateTime.UtcNow.AddDays(request.Days) : null;
+        await db.SaveChangesAsync();
+        await hub.Clients.Group(ChatHub.RoomGroup(roomId)).SendAsync("GroupMessagePinned", new { row.Id, row.GroupRoomId, row.IsPinned, row.PinnedUntil });
+        return Ok(new { row.Id, row.IsPinned, row.PinnedUntil });
     }
 
     [HttpPost("{roomId:int}/messages")]
@@ -213,6 +226,7 @@ public class GroupsController(AppDbContext db, IHubContext<ChatHub> hub) : Contr
     }
     public record CreateRoom(string Name, bool IsPublic, string? Description);
     public record SendMessage(string Content);
+    public record PinMessageRequest(int Days);
     public record UpdateRoom(string Name, string Description);
     public record MuteRequest(bool Muted);
     public record RoleRequest(string Role);

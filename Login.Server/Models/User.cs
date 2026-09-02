@@ -39,6 +39,8 @@ public class User
 
     public bool MustChangePassword { get; set; }
 
+    public bool WorldChatDoNotDisturb { get; set; }
+
     [JsonIgnore]
     public List<TaskItem> Tasks { get; set; } = [];
 }

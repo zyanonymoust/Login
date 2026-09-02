@@ -61,7 +61,12 @@ export async function apiRequest<T>(
     if (!response.ok) {
         const error = data as ApiError | null;
 
-        if (response.status === 401) throw new Error("Your session has expired. Please sign in again.");
+        if (response.status === 401) {
+            if (path === "/api/auth/login") {
+                throw new Error(error?.message || "Invalid email or password.");
+            }
+            throw new Error("Your session has expired. Please sign in again.");
+        }
         if (response.status === 429) throw new Error(error?.message || "Too many requests. Please wait a moment and try again.");
         if (response.status >= 500) throw new Error(error?.message || "Woven is temporarily unavailable. Please try again shortly.");
         throw new Error(error?.message || `Request failed with status ${response.status}`);

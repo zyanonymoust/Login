@@ -7,6 +7,8 @@ public class GroupChatMessage
     public int SenderId { get; set; }
     public string Content { get; set; } = string.Empty;
     public DateTime SentAt { get; set; } = DateTime.UtcNow;
+    public bool IsPinned { get; set; }
+    public DateTime? PinnedUntil { get; set; }
     public GroupRoom GroupRoom { get; set; } = null!;
     public User Sender { get; set; } = null!;
 }
