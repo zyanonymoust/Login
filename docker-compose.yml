@@ -44,6 +44,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ""
+    environment:
+      BACKEND_URL: http://server:8080
     ports:
       - "${FRONTEND_HOST_PORT:-3002}:80"
     depends_on:
