@@ -15,11 +15,11 @@
   background: #fbfafc;
   min-height: 100vh;
 }
-.woven-app.font-compact { font-size: 13px; }
-.woven-app.font-small { font-size: 14.5px; }
+.woven-app.font-compact { font-size: 12px; }
+.woven-app.font-small { font-size: 14px; }
 .woven-app.font-default { font-size: 16px; }
 .woven-app.font-large { font-size: 18px; }
-.woven-app.font-extra-large { font-size: 20px; }
+.woven-app.font-extra-large { font-size: 24px; }
 .woven-app,
 .woven-app * { scrollbar-width: none; -ms-overflow-style: none; }
 .woven-app::-webkit-scrollbar,
@@ -1251,6 +1251,11 @@
 .font-size-setting h3 { margin: 0 0 4px; }.font-size-setting p { margin: 0; color: var(--muted); }
 .font-size-options { margin-top: 14px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
 .font-size-options button { min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--paper); cursor: pointer; }
+.font-size-options button:nth-child(1) b { font-size: 12px; }
+.font-size-options button:nth-child(2) b { font-size: 14px; }
+.font-size-options button:nth-child(3) b { font-size: 16px; }
+.font-size-options button:nth-child(4) b { font-size: 19px; }
+.font-size-options button:nth-child(5) b { font-size: 25px; }
 .font-size-options button:nth-child(1) b { font-size: 12px; }.font-size-options button:nth-child(2) b { font-size: 15px; }.font-size-options button:nth-child(3) b { font-size: 18px; }.font-size-options button:nth-child(4) b { font-size: 21px; }.font-size-options button:nth-child(5) b { font-size: 24px; }
 .font-size-options button span { color: var(--muted); font-size: 11px; }.font-size-options button.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--paper)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent); }
 .font-size-options button.active span { color: var(--accent); }

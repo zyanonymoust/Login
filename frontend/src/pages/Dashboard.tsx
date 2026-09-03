@@ -1140,7 +1140,7 @@ export default function Dashboard() {
             <div className="font-size-setting">
               <div><h3>Text size</h3><p>Make text smaller or larger across Woven.</p></div>
               <div className="font-size-options">
-                {(["compact", "small", "default", "large", "extra-large"] as const).map((size) => <button type="button" key={size} className={fontSize === size ? "active" : ""} onClick={() => setFontSize(size)}><b>A</b><span>{size === "extra-large" ? "Extra large" : size.charAt(0).toUpperCase() + size.slice(1)}</span></button>)}
+                {(["compact", "small", "default", "large", "extra-large"] as const).map((size) => <button type="button" key={size} className={fontSize === size ? "active" : ""} onClick={() => setFontSize(size)}><b>A</b><span>{size === "compact" ? "Extra small" : size === "extra-large" ? "Extra large" : size.charAt(0).toUpperCase() + size.slice(1)}</span></button>)}
               </div>
             </div>
             <div className="background-settings">
