@@ -1147,7 +1147,7 @@ export default function Dashboard() {
               <h3>Chat background</h3>
               <p>Choose a built-in style or use your own image.</p>
               <div className="background-options">
-                {["default", "dusk", "grid"].map((x) => (
+                {["default", "dusk", "grid", "aurora", "sunset", "paper", "midnight"].map((x) => (
                   <button
                     type="button"
                     className={chatBg === x ? "active" : ""}

@@ -15,11 +15,18 @@
   background: #fbfafc;
   min-height: 100vh;
 }
-.woven-app.font-compact { font-size: 12px; }
-.woven-app.font-small { font-size: 14px; }
-.woven-app.font-default { font-size: 16px; }
-.woven-app.font-large { font-size: 18px; }
-.woven-app.font-extra-large { font-size: 24px; }
+.woven-app.font-compact { --content-font-size: 12px; }
+.woven-app.font-small { --content-font-size: 14px; }
+.woven-app.font-default { --content-font-size: 16px; }
+.woven-app.font-large { --content-font-size: 18px; }
+.woven-app.font-extra-large { --content-font-size: 22px; }
+.woven-app .message > p,
+.woven-app .composer textarea,
+.woven-app .person-profile-card > p,
+.woven-app .settings-view textarea {
+  font-size: var(--content-font-size, 16px);
+  font-family: "Times New Roman", Times, serif;
+}
 .woven-app,
 .woven-app * { scrollbar-width: none; -ms-overflow-style: none; }
 .woven-app::-webkit-scrollbar,
@@ -791,6 +798,10 @@
 .chat-view.bg-default { background: #fbfafc; }
 .chat-view.bg-dusk { background-image: radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 35%), linear-gradient(145deg, #fbfafc, #f0ebf8); }
 .chat-view.bg-grid { background-color: #fbfafc; background-image: linear-gradient(#7e7a8d12 1px, transparent 1px), linear-gradient(90deg, #7e7a8d12 1px, transparent 1px); background-size: 28px 28px; }
+.chat-view.bg-aurora { background: radial-gradient(circle at 18% 20%, #79e8d555, transparent 32%), radial-gradient(circle at 82% 16%, #8ba7ff55, transparent 34%), linear-gradient(145deg, #f5fffc, #f7f5ff); }
+.chat-view.bg-sunset { background: radial-gradient(circle at 18% 12%, #ffd08a66, transparent 34%), radial-gradient(circle at 86% 24%, #ff9eb655, transparent 36%), linear-gradient(145deg, #fffaf2, #fff3f5); }
+.chat-view.bg-paper { background-color: #fffdf7; background-image: repeating-linear-gradient(0deg, transparent 0 27px, #8aa0bd20 28px 29px); }
+.chat-view.bg-midnight { background: radial-gradient(circle at 72% 12%, #394d8b66, transparent 34%), linear-gradient(145deg, #101526, #171b32 58%, #0b1020); }
 .chat-view.bg-custom { background-size: cover; background-position: center; }
 .read-state { margin-left: 5px; color: var(--muted); font-weight: 600; }
 .read-state.read { color: var(--accent); }
@@ -1159,6 +1170,10 @@
 .bg-preview { display: block; height: 62px; border-radius: 8px; background: #fbfafc; }
 .bg-preview.dusk { background: linear-gradient(145deg, #e9dfff, #f8e7f0); }
 .bg-preview.grid { background-color: #fbfafc; background-image: linear-gradient(#7e7a8d22 1px, transparent 1px), linear-gradient(90deg, #7e7a8d22 1px, transparent 1px); background-size: 12px 12px; }
+.bg-preview.aurora { background: radial-gradient(circle at 20% 25%, #5eead4 0, transparent 42%), radial-gradient(circle at 78% 20%, #818cf8 0, transparent 44%), #eefcff; }
+.bg-preview.sunset { background: radial-gradient(circle at 18% 18%, #ffc56e 0, transparent 42%), radial-gradient(circle at 82% 24%, #fb8da7 0, transparent 46%), #fff4ea; }
+.bg-preview.paper { background-color: #fffdf6; background-image: repeating-linear-gradient(0deg, transparent 0 11px, #8295ad38 12px 13px); }
+.bg-preview.midnight { background: radial-gradient(circle at 72% 14%, #4d63ad 0, transparent 44%), linear-gradient(145deg, #11172a, #090d19); }
 .bg-preview.custom { background: linear-gradient(135deg, #ddd7e9, #aaa1bd); background-size: cover; background-position: center; }
 .boredom-break { margin-top: 42px; padding-bottom: 30px; }
 .break-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 25px; margin-bottom: 16px; }
@@ -1321,6 +1336,10 @@
 .woven-app.dark .chat-view.bg-default { background: radial-gradient(circle at 16% 8%, #202c5266, transparent 34%), linear-gradient(145deg, #080c18, #0d1222 58%, #090d19) !important; }
 .woven-app.dark .chat-view.bg-dusk { background: radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 34%), linear-gradient(145deg, #080b17, #141020) !important; }
 .woven-app.dark .chat-view.bg-grid { background-color: #090e1b !important; background-image: linear-gradient(#8fa2d010 1px, transparent 1px), linear-gradient(90deg, #8fa2d010 1px, transparent 1px) !important; }
+.woven-app.dark .chat-view.bg-aurora { background: radial-gradient(circle at 18% 20%, #1bb99b38, transparent 34%), radial-gradient(circle at 82% 16%, #5369d83d, transparent 36%), linear-gradient(145deg, #071318, #101329) !important; }
+.woven-app.dark .chat-view.bg-sunset { background: radial-gradient(circle at 18% 12%, #d88a3538, transparent 36%), radial-gradient(circle at 86% 24%, #b9446338, transparent 38%), linear-gradient(145deg, #17100d, #1d1018) !important; }
+.woven-app.dark .chat-view.bg-paper { background-color: #11151d !important; background-image: repeating-linear-gradient(0deg, transparent 0 27px, #9eb0ca12 28px 29px) !important; }
+.woven-app.dark .chat-view.bg-midnight { background: radial-gradient(circle at 72% 12%, #40569a55, transparent 36%), linear-gradient(145deg, #070b14, #11162a 58%, #060912) !important; }
 .woven-app.dark .chat-view::before { position: absolute; z-index: 0; inset: 0; pointer-events: none; content: ""; background: linear-gradient(145deg, rgba(6, 9, 18, .76), rgba(12, 15, 29, .68)); }
 .woven-app.dark .chat-view.bg-default::before { background: rgba(5, 8, 16, .34); }
 .woven-app.dark .quick-grid > button, .woven-app.dark .empty-card, .woven-app.dark .break-grid article, .woven-app.dark .break-grid button, .woven-app.dark .notice-pop, .woven-app.dark .message p, .woven-app.dark .background-options button, .woven-app.dark .background-options label { background-color: #24202f; color: var(--ink); }
