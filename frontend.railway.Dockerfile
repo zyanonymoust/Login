@@ -2,11 +2,11 @@ FROM node:24-alpine AS build
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY frontend/package.json frontend/package-lock.json ./
 
 RUN npm ci
 
-COPY . .
+COPY frontend/. .
 
 ARG VITE_API_URL=
 
@@ -20,8 +20,8 @@ ENV BACKEND_URL=http://server:8080
 ENV PORT=80
 ENV NGINX_ENVSUBST_FILTER="^(BACKEND_URL|DNS_RESOLVER|PORT)$"
 
-COPY nginx.conf /etc/nginx/templates/default.conf.template
-COPY docker-entrypoint.d/16-railway-resolver.envsh /docker-entrypoint.d/16-railway-resolver.envsh
+COPY frontend/nginx.conf /etc/nginx/templates/default.conf.template
+COPY frontend/docker-entrypoint.d/16-railway-resolver.envsh /docker-entrypoint.d/16-railway-resolver.envsh
 RUN sed -i 's/\r$//' /docker-entrypoint.d/16-railway-resolver.envsh \
     && chmod +x /docker-entrypoint.d/16-railway-resolver.envsh
 
