@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import type { SubmitEvent, ChangeEvent } from "react";
+import type { SubmitEvent, ChangeEvent, CSSProperties } from "react";
 import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import type { HubConnection } from "@microsoft/signalr";
 import { useNavigate } from "react-router";
@@ -97,6 +97,9 @@ export default function Dashboard() {
     [theme, setTheme] = useState(
       () => localStorage.getItem("woven-theme") || "violet",
     ),
+    [customThemeColor, setCustomThemeColor] = useState(
+      () => localStorage.getItem("woven-custom-theme-color") || "#8b5cf6",
+    ),
     [fontSize, setFontSize] = useState<"compact" | "small" | "default" | "large" | "extra-large">(
       () => (localStorage.getItem("woven-font-size") as "compact" | "small" | "default" | "large" | "extra-large") || "default",
     ),
@@ -192,6 +195,7 @@ export default function Dashboard() {
     apiRequest<{ muted: boolean }>(`/api/messages/${selectedId}/preference`).then((result) => setConversationMuted(result.muted)).catch(() => setConversationMuted(false));
   }, [selectedId]);
   useEffect(() => localStorage.setItem("woven-theme", theme), [theme]);
+  useEffect(() => localStorage.setItem("woven-custom-theme-color", customThemeColor), [customThemeColor]);
   useEffect(() => localStorage.setItem("woven-font-size", fontSize), [fontSize]);
   useEffect(() => localStorage.setItem("woven-dark", darkMode ? "on" : "off"), [darkMode]);
   useEffect(() => localStorage.setItem("woven-chat-bg", chatBg), [chatBg]);
@@ -660,7 +664,19 @@ export default function Dashboard() {
       list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
     };
   return (
-    <div className={`woven-app theme-${theme} font-${fontSize} ${darkMode ? "dark" : ""} ${peoplePanelCollapsed ? "people-collapsed" : ""}`}>
+    <div
+      className={`woven-app theme-${theme} font-${fontSize} ${darkMode ? "dark" : ""} ${peoplePanelCollapsed ? "people-collapsed" : ""}`}
+      style={theme === "custom" ? {
+        "--accent": customThemeColor,
+        "--accent2": `color-mix(in srgb, ${customThemeColor} 58%, white)`,
+        "--theme-glow": customThemeColor,
+        "--app-bg": `color-mix(in srgb, ${customThemeColor} 5%, white)`,
+        "--soft": `color-mix(in srgb, ${customThemeColor} 10%, white)`,
+        "--line": `color-mix(in srgb, ${customThemeColor} 20%, white)`,
+        "--sidebar-start": `color-mix(in srgb, ${customThemeColor} 4%, white)`,
+        "--sidebar-end": `color-mix(in srgb, ${customThemeColor} 13%, white)`,
+      } as CSSProperties : undefined}
+    >
       {liveToast && <button className="live-notification-toast" onClick={() => setLiveToast(null)}><span>{liveToast.type.includes("group") ? "👥" : liveToast.type.includes("friend") ? "👤" : "💬"}</span><strong>{liveToast.title}</strong><small>{liveToast.body}</small></button>}
       <aside className="app-sidebar">
         <button className="app-logo" aria-label={peoplePanelCollapsed ? "Open contacts sidebar" : "Close contacts sidebar"} title={peoplePanelCollapsed ? "Open Friends and Public" : "Close Friends and Public"} onClick={() => {
@@ -1053,6 +1069,17 @@ export default function Dashboard() {
                 </button>
               ))}
             </div>
+            <label className={`custom-color-setting ${theme === "custom" ? "active" : ""}`}>
+              <span><strong>Custom color</strong><small>Choose any color for the complete interface.</small></span>
+              <input
+                type="color"
+                value={customThemeColor}
+                onChange={(event) => {
+                  setCustomThemeColor(event.target.value);
+                  setTheme("custom");
+                }}
+              />
+            </label>
             <button className="dark-mode-setting" onClick={() => setDarkMode((value) => !value)}>
               <span>{darkMode ? "☀" : "☾"}</span>
               <div><strong>{darkMode ? "Use light mode" : "Use dark mode"}</strong><small>Switch the complete dashboard appearance.</small></div>

@@ -284,25 +284,53 @@
 .woven-app {
   --accent: #7459df;
   --accent2: #a78bfa;
+  --paper: #ffffff;
+  --panel: #ffffff;
+  --app-bg: #fbf9ff;
+  --soft: #f7f3ff;
+  --line: #e7e1f2;
+  --sidebar-start: #faf8ff;
+  --sidebar-end: #f0ecfa;
+  --theme-glow: #7459df;
   display: grid;
   grid-template-columns: 76px 300px 1fr;
   height: 100vh;
   overflow: hidden;
+  background: var(--app-bg);
+  transition: background .25s ease, color .25s ease;
 }
 .theme-ocean {
   --accent: #2489bf;
   --accent2: #74c8dc;
+  --app-bg: #f3fbfe;
+  --soft: #edf8fc;
+  --line: #d8eaf1;
+  --sidebar-start: #f3fbff;
+  --sidebar-end: #e4f4fa;
+  --theme-glow: #2489bf;
 }
 .theme-coral {
   --accent: #df6c68;
   --accent2: #f2aa87;
+  --app-bg: #fff8f6;
+  --soft: #fff0ec;
+  --line: #f0ded8;
+  --sidebar-start: #fff9f7;
+  --sidebar-end: #fbece7;
+  --theme-glow: #df6c68;
 }
 .theme-forest {
   --accent: #3f8c70;
   --accent2: #8fbd8a;
+  --app-bg: #f6fbf8;
+  --soft: #edf7f1;
+  --line: #d9e9df;
+  --sidebar-start: #f5fbf7;
+  --sidebar-end: #e6f2ea;
+  --theme-glow: #3f8c70;
 }
 .app-sidebar {
-  background: linear-gradient(180deg, #faf8ff 0%, #f0ecfa 100%);
+  background: linear-gradient(180deg, var(--sidebar-start) 0%, var(--sidebar-end) 100%);
   color: var(--ink);
   border-right: 1px solid var(--line);
   box-shadow: 4px 0 18px #4a3c7610;
@@ -361,7 +389,7 @@
 }
 .people-panel {
   position: relative;
-  background: #fff;
+  background: var(--panel);
   border-right: 1px solid var(--line);
   padding: 25px 18px 18px;
   overflow: hidden;
@@ -546,14 +574,14 @@
 .my-status-select option { color: var(--ink); background: var(--soft); }
 .app-main {
   position: relative;
-  background: #fbfafc;
+  background: var(--app-bg);
   min-width: 0;
   overflow: hidden;
 }
 .app-main:has(.settings-view) { overflow-y: auto; }
 .app-main > header {
   height: 86px;
-  background: #ffffffdd;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
   backdrop-filter: blur(15px);
   border-bottom: 1px solid var(--line);
   display: flex;
@@ -981,7 +1009,7 @@
 .settings-view {
   max-width: 620px;
   margin: 32px auto;
-  background: white;
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 20px;
   padding: 34px;
@@ -1067,6 +1095,34 @@
 }
 .swatches .forest {
   background: #3f8c70;
+}
+.custom-color-setting {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px !important;
+  margin-top: 14px !important;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--soft);
+  cursor: pointer;
+}
+.custom-color-setting.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.custom-color-setting > span { display: flex; flex-direction: column; gap: 3px; }
+.custom-color-setting small { color: var(--muted); font-weight: 500; }
+.custom-color-setting input[type="color"] {
+  width: 54px;
+  height: 42px;
+  flex: none;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  cursor: pointer;
 }
 .background-settings { margin-top: 34px; padding-top: 28px; border-top: 1px solid var(--line); }
 .background-settings h3 { font-size: 18px; }
@@ -1174,7 +1230,7 @@
 .font-size-options button:nth-child(1) b { font-size: 12px; }.font-size-options button:nth-child(2) b { font-size: 15px; }.font-size-options button:nth-child(3) b { font-size: 18px; }.font-size-options button:nth-child(4) b { font-size: 21px; }.font-size-options button:nth-child(5) b { font-size: 24px; }
 .font-size-options button span { color: var(--muted); font-size: 11px; }.font-size-options button.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--paper)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent); }
 .font-size-options button.active span { color: var(--accent); }
-.woven-app.dark { position: relative; isolation: isolate; --ink: #f3f0fa; --muted: #aaa5b8; --line: #3a4161; --soft: #242942; overflow: hidden; background: radial-gradient(circle at 70% 5%, #273568 0, #11172b 34%, #090d1b 100%); color: var(--ink); }
+.woven-app.dark { position: relative; isolation: isolate; --ink: #f3f0fa; --muted: #aaa5b8; --line: #3a4161; --soft: #242942; --paper: #171d31; --panel: #101527; overflow: hidden; background: radial-gradient(circle at 70% 5%, color-mix(in srgb, var(--theme-glow) 38%, #17203b) 0, #11172b 34%, #090d1b 100%); color: var(--ink); }
 .woven-app.dark .app-sidebar { color: white; border-right-color: #302b43; background: #211d31; box-shadow: none; }
 .woven-app.dark .app-sidebar button:not(.app-logo) { color: #aaa5b7; }
 .woven-app.dark .app-sidebar button.active, .woven-app.dark .app-sidebar button:hover { color: white; background: #ffffff17; box-shadow: none; }
