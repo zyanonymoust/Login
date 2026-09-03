@@ -106,6 +106,8 @@ export default function Dashboard() {
     [desktopNotifications, setDesktopNotifications] = useState(
       () => localStorage.getItem("woven-desktop-notifications") === "on",
     ),
+    [passwordSaving, setPasswordSaving] = useState(false),
+    [passwordStatus, setPasswordStatus] = useState<{ kind: "success" | "error"; message: string } | null>(null),
     [chatBg, setChatBg] = useState(
       () => localStorage.getItem("woven-chat-bg") || "default",
     );
@@ -473,14 +475,37 @@ export default function Dashboard() {
     changePassword = async (event: SubmitEvent<HTMLFormElement>) => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
-      await apiRequest("/api/social/password", { method: "PUT", body: JSON.stringify({ currentPassword: form.get("currentPassword"), newPassword: form.get("newPassword"), confirmPassword: form.get("confirmPassword") }) });
-      event.currentTarget.reset();
-      setMe((current) => {
-        const updated = { ...current, mustChangePassword: false };
-        localStorage.setItem("user", JSON.stringify(updated));
-        return updated;
-      });
-      window.alert("Password changed successfully.");
+      const currentPassword = String(form.get("currentPassword") || "");
+      const newPassword = String(form.get("newPassword") || "");
+      const confirmPassword = String(form.get("confirmPassword") || "");
+      setPasswordStatus(null);
+
+      if (newPassword !== confirmPassword) {
+        setPasswordStatus({ kind: "error", message: "New passwords do not match." });
+        return;
+      }
+
+      try {
+        setPasswordSaving(true);
+        await apiRequest("/api/social/password", {
+          method: "PUT",
+          body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+        });
+        event.currentTarget.reset();
+        setMe((current) => {
+          const updated = { ...current, mustChangePassword: false };
+          localStorage.setItem("user", JSON.stringify(updated));
+          return updated;
+        });
+        setPasswordStatus({ kind: "success", message: "Password changed successfully." });
+      } catch (error) {
+        setPasswordStatus({
+          kind: "error",
+          message: error instanceof Error ? error.message : "Password could not be changed.",
+        });
+      } finally {
+        setPasswordSaving(false);
+      }
     },
     replyToMessage = (message: Message) => {
       setReplyingTo(message);
@@ -1002,7 +1027,15 @@ export default function Dashboard() {
             </label>
             <button className="save">Save changes</button>
           </form>
-          <form className="settings-view password-settings" onSubmit={changePassword}><h3>Change password</h3><label>Current password<input name="currentPassword" type="password" required /></label><label>New password<input name="newPassword" type="password" minLength={6} required /></label><label>Confirm new password<input name="confirmPassword" type="password" minLength={6} required /></label><button className="save">Change password</button></form>
+          <form className="settings-view password-settings" onSubmit={changePassword}>
+            <h3>Change password</h3>
+            <p className="password-settings-description">This is separate from saving your profile information.</p>
+            <label>Current password<input name="currentPassword" type="password" autoComplete="current-password" required /></label>
+            <label>New password<input name="newPassword" type="password" autoComplete="new-password" minLength={6} required /></label>
+            <label>Confirm new password<input name="confirmPassword" type="password" autoComplete="new-password" minLength={6} required /></label>
+            {passwordStatus && <p className={`password-status ${passwordStatus.kind}`} role="status">{passwordStatus.message}</p>}
+            <button className="save" type="submit" disabled={passwordSaving}>{passwordSaving ? "Changing password…" : "Change password"}</button>
+          </form>
         </section>)}
         {view === "settings" && (
           <section className="settings-view">
