@@ -26,6 +26,7 @@ public class AppDbContext : DbContext
     public DbSet<WorldChatMute> WorldChatMutes { get; set; }
     public DbSet<WorldChatSetting> WorldChatSettings { get; set; }
     public DbSet<WorldAnnouncement> WorldAnnouncements { get; set; }
+    public DbSet<UserSession> UserSessions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,6 +46,17 @@ public class AppDbContext : DbContext
                       .HasForeignKey(task => task.UserId)
                       .OnDelete(DeleteBehavior.Cascade);
             });
+
+        modelBuilder.Entity<UserSession>(entity =>
+        {
+            entity.HasKey(session => session.Id);
+            entity.HasIndex(session => new { session.UserId, session.DeviceId }).IsUnique();
+            entity.HasIndex(session => session.TokenId).IsUnique();
+            entity.Property(session => session.DeviceId).HasMaxLength(100).IsRequired();
+            entity.Property(session => session.TokenId).HasMaxLength(64).IsRequired();
+            entity.HasOne(session => session.User).WithMany(user => user.Sessions)
+                .HasForeignKey(session => session.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
 
         modelBuilder.Entity<TaskItem>(
             entity =>

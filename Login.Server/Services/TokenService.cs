@@ -15,7 +15,7 @@ public class TokenService
         _configuration = configuration;
     }
 
-    public (string Token, DateTime Expiration) CreateToken(User user)
+    public (string Token, DateTime Expiration, string TokenId) CreateToken(User user)
     {
         var issuer = _configuration["Jwt:Issuer"]
             ?? throw new InvalidOperationException("JWT Issuer is missing.");
@@ -31,6 +31,7 @@ public class TokenService
 
         var expiration = DateTime.UtcNow.AddMinutes(expirationMinutes);
 
+        var tokenId = Guid.NewGuid().ToString();
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -39,7 +40,7 @@ public class TokenService
             new(ClaimTypes.Role, user.IsAdmin ? "Admin" : "User"),
             new(
                 JwtRegisteredClaimNames.Jti,
-                Guid.NewGuid().ToString())
+                tokenId)
         };
 
         var securityKey = new SymmetricSecurityKey(
@@ -59,6 +60,6 @@ public class TokenService
         var tokenValue =
             new JwtSecurityTokenHandler().WriteToken(token);
 
-        return (tokenValue, expiration);
+        return (tokenValue, expiration, tokenId);
     }
 }

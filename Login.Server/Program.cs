@@ -8,6 +8,7 @@ using System.Text;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using System.IdentityModel.Tokens.Jwt;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -96,6 +97,28 @@ builder.Services
                 if (!string.IsNullOrEmpty(token) && context.HttpContext.Request.Path.StartsWithSegments("/hubs/chat"))
                     context.Token = token;
                 return Task.CompletedTask;
+            },
+            OnTokenValidated = async context =>
+            {
+                var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                var tokenId = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Jti);
+                if (!int.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(tokenId))
+                {
+                    context.Fail("Invalid session.");
+                    return;
+                }
+
+                var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                var isActive = await db.UserSessions.AsNoTracking().AnyAsync(session =>
+                    session.UserId == userId &&
+                    session.TokenId == tokenId &&
+                    session.IsActive &&
+                    session.ExpiresAt > DateTime.UtcNow);
+
+                if (!isActive)
+                {
+                    context.Fail("Session is no longer active.");
+                }
             }
         };
     });

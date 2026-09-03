@@ -95,8 +95,24 @@ public class AuthApiTests
             response.StatusCode);
     }
 
+    [Fact]
+    public async Task Login_OnThirdDevice_ReturnsConflict()
+    {
+        var email = CreateEmail();
+        await Register(email, "device-one");
+
+        var first = await Login(email, "device-one");
+        var second = await Login(email, "device-two");
+        var third = await Login(email, "device-three");
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, third.StatusCode);
+    }
+
     private async Task<HttpResponseMessage> Register(
-        string email)
+        string email,
+        string? deviceId = null)
     {
         return await _client.PostAsJsonAsync(
             "/api/auth/register",
@@ -105,8 +121,16 @@ public class AuthApiTests
                 name = "Test User",
                 email,
                 password = "123456",
-                confirmPassword = "123456"
+                confirmPassword = "123456",
+                deviceId
             });
+    }
+
+    private async Task<HttpResponseMessage> Login(string email, string deviceId)
+    {
+        return await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email, password = "123456", deviceId });
     }
 
     private static string CreateEmail()

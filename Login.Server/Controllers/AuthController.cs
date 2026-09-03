@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.AspNetCore.RateLimiting;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace Login.Server.Controllers;
 
@@ -63,6 +64,7 @@ public class AuthController : ControllerBase
         }
 
         var tokenResult = _tokenService.CreateToken(user);
+        await SaveSession(user.Id, request.DeviceId, tokenResult.TokenId, tokenResult.Expiration);
 
         return Ok(new AuthResponse
         {
@@ -108,12 +110,26 @@ public class AuthController : ControllerBase
             });
         }
 
-        user.Status = "Available";
-        user.LastSeenAt = DateTime.UtcNow;
-        if (user.Id <= 2) user.IsAdmin = true;
-        await _db.SaveChangesAsync();
-
         var tokenResult = _tokenService.CreateToken(user);
+        var deviceId = NormalizeDeviceId(request.DeviceId);
+        var now = DateTime.UtcNow;
+        var activeSessions = await _db.UserSessions
+            .Where(session => session.UserId == user.Id && session.IsActive && session.ExpiresAt > now)
+            .ToListAsync();
+        var deviceSession = activeSessions.FirstOrDefault(session => session.DeviceId == deviceId);
+
+        if (deviceSession is null && activeSessions.Count >= 2)
+        {
+            return Conflict(new
+            {
+                message = "This account is already signed in on two devices. Sign out on another device before trying again."
+            });
+        }
+
+        user.Status = "Available";
+        user.LastSeenAt = now;
+        if (user.Id <= 2) user.IsAdmin = true;
+        await SaveSession(user.Id, deviceId, tokenResult.TokenId, tokenResult.Expiration, deviceSession);
 
         return Ok(new AuthResponse
         {
@@ -125,6 +141,24 @@ public class AuthController : ControllerBase
             ,IsAdmin = user.IsAdmin,
             MustChangePassword = user.MustChangePassword
         });
+    }
+
+    [Authorize]
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        var tokenId = User.FindFirstValue(JwtRegisteredClaimNames.Jti);
+        if (!string.IsNullOrWhiteSpace(tokenId))
+        {
+            var session = await _db.UserSessions.FirstOrDefaultAsync(item => item.TokenId == tokenId);
+            if (session is not null)
+            {
+                session.IsActive = false;
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        return NoContent();
     }
 
     [Authorize]
@@ -166,4 +200,38 @@ public class AuthController : ControllerBase
 
         return Ok(user);
     }
+
+    private async Task SaveSession(
+        int userId,
+        string? requestedDeviceId,
+        string tokenId,
+        DateTime expiration,
+        UserSession? existing = null)
+    {
+        var deviceId = NormalizeDeviceId(requestedDeviceId);
+        var session = existing ?? await _db.UserSessions
+            .FirstOrDefaultAsync(item => item.UserId == userId && item.DeviceId == deviceId);
+
+        if (session is null)
+        {
+            session = new UserSession
+            {
+                UserId = userId,
+                DeviceId = deviceId,
+                CreatedAt = DateTime.UtcNow
+            };
+            _db.UserSessions.Add(session);
+        }
+
+        session.TokenId = tokenId;
+        session.LastUsedAt = DateTime.UtcNow;
+        session.ExpiresAt = expiration;
+        session.IsActive = true;
+        await _db.SaveChangesAsync();
+    }
+
+    private static string NormalizeDeviceId(string? deviceId) =>
+        string.IsNullOrWhiteSpace(deviceId)
+            ? $"legacy-{Guid.NewGuid():N}"
+            : deviceId.Trim();
 }

@@ -17,6 +17,16 @@ export interface RegisterData {
     confirmPassword: string;
 }
 
+function getDeviceId() {
+    const storageKey = "woven_device_id";
+    let deviceId = localStorage.getItem(storageKey);
+    if (!deviceId) {
+        deviceId = crypto.randomUUID();
+        localStorage.setItem(storageKey, deviceId);
+    }
+    return deviceId;
+}
+
 export interface LoginData {
     email: string;
     password: string;
@@ -27,7 +37,7 @@ export function register(data: RegisterData) {
         "/api/auth/register",
         {
             method: "POST",
-            body: JSON.stringify(data)
+            body: JSON.stringify({ ...data, deviceId: getDeviceId() })
         }
     );
 }
@@ -37,7 +47,7 @@ export function login(data: LoginData) {
         "/api/auth/login",
         {
             method: "POST",
-            body: JSON.stringify(data)
+            body: JSON.stringify({ ...data, deviceId: getDeviceId() })
         }
     );
 }
@@ -58,6 +68,8 @@ export function saveAuth(data: AuthResponse) {
 }
 
 export function logout() {
+    const request = apiRequest<void>("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    return request;
 }

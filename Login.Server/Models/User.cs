@@ -43,4 +43,6 @@ public class User
 
     [JsonIgnore]
     public List<TaskItem> Tasks { get; set; } = [];
+    [JsonIgnore]
+    public List<UserSession> Sessions { get; set; } = [];
 }

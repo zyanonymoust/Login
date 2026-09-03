@@ -20,4 +20,7 @@ public class RegisterRequest
     [Required]
     [Compare(nameof(Password))]
     public string ConfirmPassword { get; set; } = string.Empty;
+
+    [MaxLength(100)]
+    public string? DeviceId { get; set; }
 }
