@@ -52,7 +52,15 @@ type Me = {
 };
 type RecentConversation = { kind: "person" | "group"; id: number; name: string; preview: string; activityAt: string; memberCount: number };
 type AppNotification = { id: number; type: string; title: string; body: string; targetKind: "person" | "group" | "world"; targetId: number; count: number; isRead: boolean; createdAt: string };
+type ThemeCssProperties = CSSProperties & { [key: `--${string}`]: string };
 export type GroupRoom = { id:number; name:string; description:string; isPublic:boolean; status:string; role:string; isMuted:boolean; doNotDisturb:boolean; memberCount:number; invitedBy:string; createdAt:string; unread:number };
+const readableTextOn = (hex: string) => {
+  const value = hex.replace("#", "");
+  const red = Number.parseInt(value.slice(0, 2), 16);
+  const green = Number.parseInt(value.slice(2, 4), 16);
+  const blue = Number.parseInt(value.slice(4, 6), 16);
+  return (red * 299 + green * 587 + blue * 114) / 1000 > 155 ? "#111827" : "#ffffff";
+};
 export default function Dashboard() {
   const fileInput = useRef<HTMLInputElement>(null),
     chatHubRef = useRef<HubConnection | null>(null),
@@ -99,6 +107,9 @@ export default function Dashboard() {
     ),
     [customThemeColor, setCustomThemeColor] = useState(
       () => localStorage.getItem("woven-custom-theme-color") || "#8b5cf6",
+    ),
+    [customThemeHex, setCustomThemeHex] = useState(
+      () => (localStorage.getItem("woven-custom-theme-color") || "#8b5cf6").toUpperCase(),
     ),
     [fontSize, setFontSize] = useState<"compact" | "small" | "default" | "large" | "extra-large">(
       () => (localStorage.getItem("woven-font-size") as "compact" | "small" | "default" | "large" | "extra-large") || "default",
@@ -667,15 +678,32 @@ export default function Dashboard() {
     <div
       className={`woven-app theme-${theme} font-${fontSize} ${darkMode ? "dark" : ""} ${peoplePanelCollapsed ? "people-collapsed" : ""}`}
       style={theme === "custom" ? {
-        "--accent": customThemeColor,
-        "--accent2": `color-mix(in srgb, ${customThemeColor} 58%, white)`,
+        "--accent": darkMode
+          ? `color-mix(in srgb, ${customThemeColor} 78%, #7b8190)`
+          : `color-mix(in srgb, ${customThemeColor} 90%, #626875)`,
+        "--accent2": darkMode
+          ? `color-mix(in srgb, ${customThemeColor} 62%, #a8acb5)`
+          : `color-mix(in srgb, ${customThemeColor} 58%, white)`,
         "--theme-glow": customThemeColor,
-        "--app-bg": `color-mix(in srgb, ${customThemeColor} 5%, white)`,
-        "--soft": `color-mix(in srgb, ${customThemeColor} 10%, white)`,
-        "--line": `color-mix(in srgb, ${customThemeColor} 20%, white)`,
-        "--sidebar-start": `color-mix(in srgb, ${customThemeColor} 4%, white)`,
-        "--sidebar-end": `color-mix(in srgb, ${customThemeColor} 13%, white)`,
-      } as CSSProperties : undefined}
+        "--on-accent": readableTextOn(customThemeColor),
+        ...(darkMode ? {
+          "--ink": "#f4f4f6",
+          "--muted": "#aeb1bd",
+          "--app-bg": `color-mix(in srgb, ${customThemeColor} 5%, #080b14)`,
+          "--paper": `color-mix(in srgb, ${customThemeColor} 7%, #151a28)`,
+          "--panel": `color-mix(in srgb, ${customThemeColor} 6%, #111622)`,
+          "--soft": `color-mix(in srgb, ${customThemeColor} 10%, #202534)`,
+          "--line": `color-mix(in srgb, ${customThemeColor} 18%, #3d4352)`,
+          "--sidebar-start": `color-mix(in srgb, ${customThemeColor} 7%, #101522)`,
+          "--sidebar-end": `color-mix(in srgb, ${customThemeColor} 4%, #090d17)`,
+        } : {
+          "--app-bg": `color-mix(in srgb, ${customThemeColor} 5%, white)`,
+          "--soft": `color-mix(in srgb, ${customThemeColor} 10%, white)`,
+          "--line": `color-mix(in srgb, ${customThemeColor} 20%, white)`,
+          "--sidebar-start": `color-mix(in srgb, ${customThemeColor} 4%, white)`,
+          "--sidebar-end": `color-mix(in srgb, ${customThemeColor} 13%, white)`,
+        }),
+      } as ThemeCssProperties : undefined}
     >
       {liveToast && <button className="live-notification-toast" onClick={() => setLiveToast(null)}><span>{liveToast.type.includes("group") ? "👥" : liveToast.type.includes("friend") ? "👤" : "💬"}</span><strong>{liveToast.title}</strong><small>{liveToast.body}</small></button>}
       <aside className="app-sidebar">
@@ -1070,15 +1098,36 @@ export default function Dashboard() {
               ))}
             </div>
             <label className={`custom-color-setting ${theme === "custom" ? "active" : ""}`}>
-              <span><strong>Custom color</strong><small>Choose any color for the complete interface.</small></span>
-              <input
-                type="color"
-                value={customThemeColor}
-                onChange={(event) => {
-                  setCustomThemeColor(event.target.value);
-                  setTheme("custom");
-                }}
-              />
+              <span className="custom-color-copy"><i aria-hidden="true">🎨</i><span><strong>Custom color</strong><small>Use the color picker or enter an exact HEX code.</small></span></span>
+              <span className="custom-color-controls">
+                <input
+                  type="color"
+                  title="Open color picker"
+                  aria-label="Choose a custom theme color"
+                  value={customThemeColor}
+                  onChange={(event) => {
+                    setCustomThemeColor(event.target.value);
+                    setCustomThemeHex(event.target.value.toUpperCase());
+                    setTheme("custom");
+                  }}
+                />
+                <input
+                  className="custom-color-hex"
+                  aria-label="Custom HEX color"
+                  value={customThemeHex}
+                  maxLength={7}
+                  spellCheck={false}
+                  onChange={(event) => {
+                    const value = event.target.value.toUpperCase();
+                    setCustomThemeHex(value);
+                    if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+                      setCustomThemeColor(value.toLowerCase());
+                      setTheme("custom");
+                    }
+                  }}
+                  onBlur={() => setCustomThemeHex(customThemeColor.toUpperCase())}
+                />
+              </span>
             </label>
             <button className="dark-mode-setting" onClick={() => setDarkMode((value) => !value)}>
               <span>{darkMode ? "☀" : "☾"}</span>
@@ -1118,6 +1167,23 @@ export default function Dashboard() {
                   <input type="file" accept="image/*" onChange={uploadBackground} />
                 </label>
               </div>
+            </div>
+            <div className="appearance-reset">
+              <div><strong>Reset appearance</strong><small>Restore the original colors, light mode, text size, and chat background.</small></div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!window.confirm("Reset all appearance settings to their defaults?")) return;
+                  setTheme("violet");
+                  setCustomThemeColor("#8b5cf6");
+                  setCustomThemeHex("#8B5CF6");
+                  setDarkMode(false);
+                  setFontSize("default");
+                  setChatBg("default");
+                }}
+              >
+                Reset to default
+              </button>
             </div>
           </section>
         )}
