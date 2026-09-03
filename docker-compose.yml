@@ -47,7 +47,7 @@ services:
     environment:
       BACKEND_URL: http://server:8080
     ports:
-      - "${FRONTEND_HOST_PORT:-3002}:80"
+      - "${FRONTEND_HOST_PORT:-3002}:8080"
     depends_on:
       - server
 
