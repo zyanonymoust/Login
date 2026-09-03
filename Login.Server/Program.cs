@@ -170,6 +170,42 @@ if (!app.Environment.IsEnvironment("Testing"))
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
     db.Database.Migrate();
+
+    var bootstrapEmail = builder.Configuration["Admin:BootstrapEmail"]?.Trim().ToLowerInvariant();
+    var bootstrapPassword = builder.Configuration["Admin:BootstrapPassword"];
+    var bootstrapName = builder.Configuration["Admin:BootstrapName"]?.Trim();
+
+    if (!string.IsNullOrWhiteSpace(bootstrapEmail) && !string.IsNullOrWhiteSpace(bootstrapPassword))
+    {
+        var bootstrapAdmin = db.Users.SingleOrDefault(user => user.Email == bootstrapEmail);
+        if (bootstrapAdmin is null)
+        {
+            bootstrapAdmin = new Login.Server.Models.User
+            {
+                Name = string.IsNullOrWhiteSpace(bootstrapName) ? "Owner" : bootstrapName,
+                Email = bootstrapEmail,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(bootstrapPassword),
+                IsAdmin = true,
+                MustChangePassword = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.Users.Add(bootstrapAdmin);
+            db.SaveChanges();
+        }
+        else
+        {
+            bootstrapAdmin.IsAdmin = true;
+            bootstrapAdmin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(bootstrapPassword);
+            bootstrapAdmin.MustChangePassword = true;
+
+            foreach (var session in db.UserSessions.Where(session => session.UserId == bootstrapAdmin.Id))
+            {
+                session.IsActive = false;
+            }
+
+            db.SaveChanges();
+        }
+    }
 }
 
 app.Run();

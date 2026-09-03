@@ -57,12 +57,6 @@ public class AuthController : ControllerBase
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
-        if (user.Id <= 2)
-        {
-            user.IsAdmin = true;
-            await _db.SaveChangesAsync();
-        }
-
         var tokenResult = _tokenService.CreateToken(user);
         await SaveSession(user.Id, request.DeviceId, tokenResult.TokenId, tokenResult.Expiration);
 
@@ -128,7 +122,6 @@ public class AuthController : ControllerBase
 
         user.Status = "Available";
         user.LastSeenAt = now;
-        if (user.Id <= 2) user.IsAdmin = true;
         await SaveSession(user.Id, deviceId, tokenResult.TokenId, tokenResult.Expiration, deviceSession);
 
         return Ok(new AuthResponse
