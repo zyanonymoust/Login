@@ -20,6 +20,8 @@ type PlatformType =
     | "ice"
     | "temporary";
 
+type ChargeSource = "keyboard" | "stage" | "slider";
+
 interface Player {
     x: number;
     y: number;
@@ -56,6 +58,12 @@ interface GameStats {
     longestJump: number;
     bestStreak: number;
     stars: number;
+}
+
+interface GhostPoint {
+    time: number;
+    x: number;
+    y: number;
 }
 
 const GAME_WIDTH = 900;
@@ -165,6 +173,10 @@ function JumpGame() {
     const chargeExpiredRef = useRef(false);
     const chargeStartedAtRef = useRef(0);
     const chargeRef = useRef(0);
+    const chargeSourceRef = useRef<ChargeSource | null>(null);
+    const keyboardChargeHeldRef = useRef(false);
+    const stageChargeHeldRef = useRef(false);
+    const doubleJumpAvailableRef = useRef(false);
     const currentPlatformRef = useRef(0);
     const nextPlatformIdRef = useRef(9);
     const scoreRef = useRef(0);
@@ -177,8 +189,9 @@ function JumpGame() {
         stars: 0
     });
     const collectiblesRef = useRef<Collectible[]>([]);
-    const ghostRef = useRef<{ x: number; y: number }[]>([]);
-    const ghostRecordingRef = useRef<{ x: number; y: number }[]>([]);
+    const ghostRef = useRef<GhostPoint[]>([]);
+    const ghostRecordingRef = useRef<GhostPoint[]>([]);
+    const runStartedAtRef = useRef(0);
     const bonusTextRef = useRef("");
     const bonusUntilRef = useRef(0);
 
@@ -288,6 +301,10 @@ function JumpGame() {
         chargeExpiredRef.current = false;
         chargeStartedAtRef.current = 0;
         chargeRef.current = 0;
+        chargeSourceRef.current = null;
+        keyboardChargeHeldRef.current = false;
+        stageChargeHeldRef.current = false;
+        doubleJumpAvailableRef.current = false;
         currentPlatformRef.current = 0;
         nextPlatformIdRef.current = 9;
         scoreRef.current = 0;
@@ -302,15 +319,30 @@ function JumpGame() {
         collectiblesRef.current = [];
         ghostRecordingRef.current = [];
         try {
-            ghostRef.current = JSON.parse(
+            const storedGhost = JSON.parse(
                 localStorage.getItem("jump-game-ghost") ?? "[]"
-            ) as { x: number; y: number }[];
+            ) as Array<Partial<GhostPoint>>;
+            ghostRef.current = Array.isArray(storedGhost)
+                ? storedGhost
+                    .filter((point) =>
+                        typeof point.x === "number" &&
+                        typeof point.y === "number"
+                    )
+                    .map((point, index) => ({
+                        time: typeof point.time === "number"
+                            ? point.time
+                            : index * 40,
+                        x: point.x as number,
+                        y: point.y as number
+                    }))
+                : [];
         } catch {
             ghostRef.current = [];
         }
         bonusTextRef.current = "";
         bonusUntilRef.current = 0;
         previousTimeRef.current = null;
+        runStartedAtRef.current = performance.now();
 
         setScore(0);
         setCharge(0);
@@ -320,7 +352,7 @@ function JumpGame() {
         updateGameState("playing");
     }, [updateGameState]);
 
-    const beginCharge = useCallback(() => {
+    const beginCharge = useCallback((source: ChargeSource) => {
         if (
             gameStateRef.current !==
             "playing" ||
@@ -332,6 +364,7 @@ function JumpGame() {
         }
 
         chargingRef.current = true;
+        chargeSourceRef.current = source;
         chargeStartedAtRef.current =
             performance.now();
 
@@ -339,9 +372,14 @@ function JumpGame() {
         setCharge(0);
     }, []);
 
-    const releaseCharge = useCallback(() => {
+    const releaseCharge = useCallback((source: ChargeSource) => {
+        if (chargeSourceRef.current !== source) {
+            return;
+        }
+
         if (chargeExpiredRef.current) {
             chargeExpiredRef.current = false;
+            chargeSourceRef.current = null;
             return;
         }
 
@@ -359,6 +397,8 @@ function JumpGame() {
 
         chargingRef.current = false;
         manualChargingRef.current = false;
+        chargeSourceRef.current = null;
+        chargeSourceRef.current = null;
         chargeExpiredRef.current = false;
         chargeRef.current = 0;
         setCharge(0);
@@ -386,12 +426,29 @@ function JumpGame() {
 
         player.velocityY =
             -(effectivePower * 840);
+        doubleJumpAvailableRef.current = true;
 
         statsRef.current = {
             ...statsRef.current,
             jumps: statsRef.current.jumps + 1
         };
         setStats(statsRef.current);
+    }, []);
+
+    const performDoubleJump = useCallback(() => {
+        const player = playerRef.current;
+        if (
+            gameStateRef.current !== "playing" ||
+            player.grounded ||
+            !doubleJumpAvailableRef.current
+        ) {
+            return;
+        }
+
+        doubleJumpAvailableRef.current = false;
+        player.velocityY = -620;
+        bonusTextRef.current = "SECRET DOUBLE JUMP ↑";
+        bonusUntilRef.current = performance.now() + 850;
     }, []);
 
     const finishGame = useCallback(() => {
@@ -412,7 +469,7 @@ function JumpGame() {
         if (ghostRecordingRef.current.length > 0) {
             localStorage.setItem(
                 "jump-game-ghost",
-                JSON.stringify(ghostRecordingRef.current.slice(-600))
+                JSON.stringify(ghostRecordingRef.current)
             );
         }
 
@@ -438,6 +495,7 @@ function JumpGame() {
         if (gameStateRef.current === "playing") {
             chargingRef.current = false;
             manualChargingRef.current = false;
+            chargeSourceRef.current = null;
             updateGameState("paused");
         } else if (gameStateRef.current === "paused") {
             previousTimeRef.current = null;
@@ -449,6 +507,12 @@ function JumpGame() {
         function handleKeyDown(
             event: KeyboardEvent
         ) {
+            if (event.code === "ArrowUp") {
+                event.preventDefault();
+                if (!event.repeat) performDoubleJump();
+                return;
+            }
+
             if (event.code === "KeyP" || event.code === "Escape") {
                 event.preventDefault();
                 togglePause();
@@ -460,6 +524,7 @@ function JumpGame() {
             }
 
             event.preventDefault();
+            keyboardChargeHeldRef.current = true;
 
             if (event.repeat) {
                 return;
@@ -475,7 +540,7 @@ function JumpGame() {
                 return;
             }
 
-            beginCharge();
+            beginCharge("keyboard");
         }
 
         function handleKeyUp(
@@ -486,11 +551,24 @@ function JumpGame() {
             }
 
             event.preventDefault();
-            releaseCharge();
+            keyboardChargeHeldRef.current = false;
+            releaseCharge("keyboard");
         }
 
         function handlePointerUp() {
-            releaseCharge();
+            stageChargeHeldRef.current = false;
+            releaseCharge("stage");
+        }
+
+        function handleBlur() {
+            chargingRef.current = false;
+            manualChargingRef.current = false;
+            chargeSourceRef.current = null;
+            keyboardChargeHeldRef.current = false;
+            stageChargeHeldRef.current = false;
+            chargeExpiredRef.current = false;
+            chargeRef.current = 0;
+            setCharge(0);
         }
 
         window.addEventListener(
@@ -513,6 +591,8 @@ function JumpGame() {
             handlePointerUp
         );
 
+        window.addEventListener("blur", handleBlur);
+
         return () => {
             window.removeEventListener(
                 "keydown",
@@ -533,12 +613,15 @@ function JumpGame() {
                 "pointercancel",
                 handlePointerUp
             );
+
+            window.removeEventListener("blur", handleBlur);
         };
     }, [
         beginCharge,
         releaseCharge,
         resetGame,
         togglePause,
+        performDoubleJump,
     ]);
 
     useEffect(() => {
@@ -917,22 +1000,82 @@ function JumpGame() {
             }
         }
 
-        function drawGhost() {
-            const point = ghostRef.current[
-                Math.min(
-                    ghostRef.current.length - 1,
-                    ghostRecordingRef.current.length
-                )
-            ];
+        function drawGhost(animationTime: number) {
+            const elapsed = animationTime - runStartedAtRef.current;
+            let point: GhostPoint | undefined;
+            let pointIndex = -1;
+            for (let index = 0; index < ghostRef.current.length; index++) {
+                const candidate = ghostRef.current[index];
+                if (candidate.time > elapsed) break;
+                point = candidate;
+                pointIndex = index;
+            }
             if (!point) return;
+            const ghostX = point.x - cameraXRef.current;
+            const ghostWidth = playerRef.current.width;
+            const ghostHeight = playerRef.current.height;
             context!.save();
-            context!.globalAlpha = 0.22;
-            context!.fillStyle = "#ffffff";
-            context!.fillRect(
-                point.x - cameraXRef.current,
+
+            const trailStart = Math.max(0, pointIndex - 28);
+            for (let index = trailStart; index < pointIndex; index += 3) {
+                const trailPoint = ghostRef.current[index];
+                const progress = (index - trailStart + 1) /
+                    Math.max(1, pointIndex - trailStart);
+                context!.globalAlpha = 0.04 + progress * 0.12;
+                context!.fillStyle = "#d8ceff";
+                context!.beginPath();
+                context!.arc(
+                    trailPoint.x - cameraXRef.current + ghostWidth / 2,
+                    trailPoint.y + ghostHeight / 2,
+                    2 + progress * 1.5,
+                    0,
+                    Math.PI * 2
+                );
+                context!.fill();
+            }
+
+            context!.globalAlpha = 0.24;
+            context!.shadowColor = "#c8baff";
+            context!.shadowBlur = 8;
+            drawRoundedRectangle(
+                ghostX,
                 point.y,
-                playerRef.current.width,
-                playerRef.current.height
+                ghostWidth,
+                ghostHeight,
+                10
+            );
+            context!.lineWidth = 2;
+            context!.strokeStyle = "#e6e0ff";
+            context!.stroke();
+            context!.shadowBlur = 0;
+
+            context!.globalAlpha = 0.32;
+            context!.fillStyle = "#e6e0ff";
+            context!.beginPath();
+            context!.arc(
+                ghostX + ghostWidth * 0.34,
+                point.y + ghostHeight * 0.35,
+                2.5,
+                0,
+                Math.PI * 2
+            );
+            context!.arc(
+                ghostX + ghostWidth * 0.67,
+                point.y + ghostHeight * 0.35,
+                2.5,
+                0,
+                Math.PI * 2
+            );
+            context!.fill();
+
+            context!.globalAlpha = 0.38;
+            context!.fillStyle = "#e6e0ff";
+            context!.font = "700 9px Inter, sans-serif";
+            context!.textAlign = "center";
+            context!.fillText(
+                "LAST ME",
+                ghostX + ghostWidth / 2,
+                point.y - 8
             );
             context!.restore();
         }
@@ -1141,6 +1284,20 @@ function JumpGame() {
             const player =
                 playerRef.current;
 
+            const elapsed = animationTime - runStartedAtRef.current;
+            const lastGhostPoint =
+                ghostRecordingRef.current[ghostRecordingRef.current.length - 1];
+            if (
+                ghostRecordingRef.current.length < 2400 &&
+                (lastGhostPoint === undefined || elapsed - lastGhostPoint.time >= 40)
+            ) {
+                ghostRecordingRef.current.push({
+                    time: elapsed,
+                    x: player.x,
+                    y: player.y
+                });
+            }
+
             for (const platform of platformsRef.current) {
                 if (platform.type === "moving" && !platform.broken) {
                     const previousX = platform.x;
@@ -1206,10 +1363,6 @@ function JumpGame() {
                 player.y +=
                     player.velocityY *
                     deltaTime;
-
-                if (ghostRecordingRef.current.length < 600) {
-                    ghostRecordingRef.current.push({ x: player.x, y: player.y });
-                }
 
                 for (const star of collectiblesRef.current) {
                     if (
@@ -1285,6 +1438,7 @@ function JumpGame() {
                         player.velocityX = 0;
                         player.velocityY = 0;
                         player.grounded = true;
+                        doubleJumpAvailableRef.current = false;
 
                         if (platform.type === "temporary") {
                             platform.landedAt = animationTime;
@@ -1424,6 +1578,22 @@ function JumpGame() {
                             setCentreStreak(0);
                         }
 
+                        if (
+                            platform.type !== "bounce" &&
+                            !chargingRef.current &&
+                            (keyboardChargeHeldRef.current ||
+                                stageChargeHeldRef.current)
+                        ) {
+                            chargingRef.current = true;
+                            chargeSourceRef.current =
+                                keyboardChargeHeldRef.current
+                                    ? "keyboard"
+                                    : "stage";
+                            chargeStartedAtRef.current = animationTime;
+                            chargeRef.current = 0;
+                            setCharge(0);
+                        }
+
                         if (platform.type === "bounce") {
                             player.grounded = false;
                             player.velocityY = -520;
@@ -1490,7 +1660,7 @@ function JumpGame() {
             drawBackground(animationTime);
             drawPlatforms();
             drawCollectibles();
-            drawGhost();
+            drawGhost(animationTime);
             drawPlayer();
             drawBonus(animationTime);
 
@@ -1569,9 +1739,10 @@ function JumpGame() {
                 className="jump-game-stage"
                 onPointerDown={(event) => {
                     if (event.pointerType === "mouse" && event.button !== 0) return;
+                    stageChargeHeldRef.current = true;
                     if (gameStateRef.current !== "playing" || !playerRef.current.grounded) return;
                     event.preventDefault();
-                    beginCharge();
+                    beginCharge("stage");
                 }}
                 onContextMenu={(event) =>
                     event.preventDefault()
@@ -1640,6 +1811,8 @@ function JumpGame() {
                         <h4>Take a break</h4>
                         <button
                             type="button"
+                            aria-label={gameState === "paused" ? "Resume game" : "Pause game"}
+                            title={gameState === "paused" ? "Resume game" : "Pause game"}
                             onPointerDown={(event) => event.stopPropagation()}
                             onClick={togglePause}
                         >
@@ -1655,6 +1828,8 @@ function JumpGame() {
                         <span>Stars <strong>{stats.stars}</strong></span>
                         <button
                             type="button"
+                            aria-label={gameState === "paused" ? "Resume game" : "Pause game"}
+                            title={gameState === "paused" ? "Resume game" : "Pause game"}
                             onPointerDown={(event) => event.stopPropagation()}
                             onClick={togglePause}
                         >
@@ -1662,6 +1837,8 @@ function JumpGame() {
                         </button>
                         <button
                             type="button"
+                            aria-label="Restart game"
+                            title="Restart game"
                             onPointerDown={(event) => event.stopPropagation()}
                             onClick={resetGame}
                         >
@@ -1674,7 +1851,7 @@ function JumpGame() {
                     "playing" && (
                         <div className="charge-container">
                             <div className="charge-label">
-                                <span>Jump power</span>
+                                <span>Hold stage / Space · release</span>
                                 <strong>{chargePercent}%</strong>
                             </div>
                             <div
@@ -1695,6 +1872,7 @@ function JumpGame() {
                                     chargeExpiredRef.current = false;
                                     manualChargingRef.current = true;
                                     chargingRef.current = true;
+                                    chargeSourceRef.current = "slider";
                                     chargeRef.current = nextCharge;
                                     setCharge(nextCharge);
                                 }}
@@ -1714,11 +1892,12 @@ function JumpGame() {
                                     const finalCharge = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
                                     chargeRef.current = finalCharge;
                                     setCharge(finalCharge);
-                                    releaseCharge();
+                                    releaseCharge("slider");
                                 }}
                                 onPointerCancel={() => {
                                     manualChargingRef.current = false;
                                     chargingRef.current = false;
+                                    chargeSourceRef.current = null;
                                     chargeRef.current = 0;
                                     setCharge(0);
                                 }}
@@ -1735,7 +1914,7 @@ function JumpGame() {
                 </span>
 
                 <span>
-                    ⌨️ Space bar
+                    ⌨️ Hold Space to charge
                 </span>
 
                 <span>

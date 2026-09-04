@@ -311,6 +311,8 @@
 
 .jump-game-live-hud strong { color: #fff4a8; }
 .jump-game-live-hud button {
+    display: inline-grid;
+    place-items: center;
     width: 25px;
     height: 25px;
     padding: 0;
@@ -318,6 +320,10 @@
     border-radius: 7px;
     color: white;
     background: rgba(128, 98, 255, 0.55);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1;
     cursor: pointer;
 }
 
