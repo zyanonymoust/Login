@@ -291,6 +291,30 @@
     transition: none;
 }
 
+.double-jump-meter {
+    margin-top: 12px;
+    padding-top: 9px;
+    border-top: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.double-jump-meter .charge-label {
+    margin-bottom: 6px;
+}
+
+.double-jump-meter .charge-label span,
+.double-jump-meter .charge-label strong {
+    color: #ffe990;
+}
+
+.double-jump-track {
+    background: rgba(255, 227, 108, 0.14);
+}
+
+.double-jump-fill {
+    background: linear-gradient(90deg, #ffd85a, #ff9d4d, #ff64bc);
+    box-shadow: 0 0 14px rgba(255, 190, 73, 0.72);
+}
+
 .jump-game-live-hud {
     position: absolute;
     z-index: 3;
@@ -505,6 +529,11 @@
 
     .charge-track {
         height: 5px;
+    }
+
+    .double-jump-meter {
+        margin-top: 8px;
+        padding-top: 6px;
     }
 
     .jump-game-overlay {

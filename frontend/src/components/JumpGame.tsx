@@ -177,6 +177,8 @@ function JumpGame() {
     const keyboardChargeHeldRef = useRef(false);
     const stageChargeHeldRef = useRef(false);
     const doubleJumpAvailableRef = useRef(false);
+    const doubleJumpChargingRef = useRef(false);
+    const doubleJumpChargeStartedAtRef = useRef(0);
     const currentPlatformRef = useRef(0);
     const nextPlatformIdRef = useRef(9);
     const scoreRef = useRef(0);
@@ -215,6 +217,8 @@ function JumpGame() {
         });
 
     const [charge, setCharge] = useState(0);
+    const [doubleJumpCharging, setDoubleJumpCharging] = useState(false);
+    const [doubleJumpCharge, setDoubleJumpCharge] = useState(0);
     const [centreStreak, setCentreStreak] = useState(0);
     const [stats, setStats] = useState<GameStats>(statsRef.current);
     const [achievements, setAchievements] = useState<string[]>([]);
@@ -305,6 +309,8 @@ function JumpGame() {
         keyboardChargeHeldRef.current = false;
         stageChargeHeldRef.current = false;
         doubleJumpAvailableRef.current = false;
+        doubleJumpChargingRef.current = false;
+        doubleJumpChargeStartedAtRef.current = 0;
         currentPlatformRef.current = 0;
         nextPlatformIdRef.current = 9;
         scoreRef.current = 0;
@@ -346,6 +352,8 @@ function JumpGame() {
 
         setScore(0);
         setCharge(0);
+        setDoubleJumpCharging(false);
+        setDoubleJumpCharge(0);
         setCentreStreak(0);
         setStats(statsRef.current);
         setAchievements([]);
@@ -435,19 +443,45 @@ function JumpGame() {
         setStats(statsRef.current);
     }, []);
 
-    const performDoubleJump = useCallback(() => {
+    const beginDoubleJumpCharge = useCallback(() => {
         const player = playerRef.current;
         if (
             gameStateRef.current !== "playing" ||
             player.grounded ||
-            !doubleJumpAvailableRef.current
+            !doubleJumpAvailableRef.current ||
+            doubleJumpChargingRef.current
         ) {
             return;
         }
 
+        doubleJumpChargingRef.current = true;
+        doubleJumpChargeStartedAtRef.current = performance.now();
+        setDoubleJumpCharging(true);
+        setDoubleJumpCharge(0);
+    }, []);
+
+    const releaseDoubleJumpCharge = useCallback(() => {
+        if (!doubleJumpChargingRef.current) return;
+
+        const player = playerRef.current;
+        const heldTime =
+            performance.now() - doubleJumpChargeStartedAtRef.current;
+        const storedPower = Math.max(
+            0.45,
+            Math.min(1, heldTime / MAX_CHARGE_TIME)
+        );
+
+        doubleJumpChargingRef.current = false;
         doubleJumpAvailableRef.current = false;
-        player.velocityY = -620;
-        bonusTextRef.current = "SECRET DOUBLE JUMP ↑";
+        setDoubleJumpCharging(false);
+        setDoubleJumpCharge(0);
+        player.velocityY = -(420 + storedPower * 420);
+        player.velocityX = Math.max(
+            player.velocityX,
+            storedPower * 520
+        );
+        bonusTextRef.current =
+            `SECRET DOUBLE JUMP ${Math.round(storedPower * 100)}% ↑`;
         bonusUntilRef.current = performance.now() + 850;
     }, []);
 
@@ -461,8 +495,11 @@ function JumpGame() {
 
         chargingRef.current = false;
         manualChargingRef.current = false;
+        doubleJumpChargingRef.current = false;
         chargeRef.current = 0;
         setCharge(0);
+        setDoubleJumpCharging(false);
+        setDoubleJumpCharge(0);
 
         const finalScore = scoreRef.current;
 
@@ -495,7 +532,11 @@ function JumpGame() {
         if (gameStateRef.current === "playing") {
             chargingRef.current = false;
             manualChargingRef.current = false;
+            doubleJumpChargingRef.current = false;
             chargeSourceRef.current = null;
+            setDoubleJumpCharging(false);
+            setDoubleJumpCharge(0);
+            setCharge(0);
             updateGameState("paused");
         } else if (gameStateRef.current === "paused") {
             previousTimeRef.current = null;
@@ -509,7 +550,7 @@ function JumpGame() {
         ) {
             if (event.code === "ArrowUp") {
                 event.preventDefault();
-                if (!event.repeat) performDoubleJump();
+                if (!event.repeat) beginDoubleJumpCharge();
                 return;
             }
 
@@ -546,6 +587,12 @@ function JumpGame() {
         function handleKeyUp(
             event: KeyboardEvent
         ) {
+            if (event.code === "ArrowUp") {
+                event.preventDefault();
+                releaseDoubleJumpCharge();
+                return;
+            }
+
             if (event.code !== "Space") {
                 return;
             }
@@ -566,9 +613,12 @@ function JumpGame() {
             chargeSourceRef.current = null;
             keyboardChargeHeldRef.current = false;
             stageChargeHeldRef.current = false;
+            doubleJumpChargingRef.current = false;
             chargeExpiredRef.current = false;
             chargeRef.current = 0;
             setCharge(0);
+            setDoubleJumpCharging(false);
+            setDoubleJumpCharge(0);
         }
 
         window.addEventListener(
@@ -621,7 +671,8 @@ function JumpGame() {
         releaseCharge,
         resetGame,
         togglePause,
-        performDoubleJump,
+        beginDoubleJumpCharge,
+        releaseDoubleJumpCharge,
     ]);
 
     useEffect(() => {
@@ -1327,6 +1378,15 @@ function JumpGame() {
                 }
             }
 
+            if (doubleJumpChargingRef.current) {
+                const storedPower = Math.min(
+                    1,
+                    (animationTime - doubleJumpChargeStartedAtRef.current) /
+                        MAX_CHARGE_TIME
+                );
+                setDoubleJumpCharge(storedPower);
+            }
+
             if (
                 chargingRef.current &&
                 player.grounded &&
@@ -1431,6 +1491,17 @@ function JumpGame() {
                             continue;
                         }
 
+                        const incomingVelocityX =
+                            player.velocityX;
+                        const incomingBouncePower =
+                            Math.max(
+                                520,
+                                Math.min(
+                                    840,
+                                    Math.abs(player.velocityY)
+                                )
+                            );
+
                         player.y =
                             platform.y -
                             player.height;
@@ -1439,6 +1510,9 @@ function JumpGame() {
                         player.velocityY = 0;
                         player.grounded = true;
                         doubleJumpAvailableRef.current = false;
+                        doubleJumpChargingRef.current = false;
+                        setDoubleJumpCharging(false);
+                        setDoubleJumpCharge(0);
 
                         if (platform.type === "temporary") {
                             platform.landedAt = animationTime;
@@ -1477,6 +1551,12 @@ function JumpGame() {
                             const perfect =
                                 centreDistance <=
                                 16;
+
+                            if (perfect) {
+                                player.x =
+                                    platformCentre -
+                                    player.width / 2;
+                            }
 
                             const good =
                                 !perfect &&
@@ -1579,7 +1659,6 @@ function JumpGame() {
                         }
 
                         if (
-                            platform.type !== "bounce" &&
                             !chargingRef.current &&
                             (keyboardChargeHeldRef.current ||
                                 stageChargeHeldRef.current)
@@ -1594,9 +1673,13 @@ function JumpGame() {
                             setCharge(0);
                         }
 
-                        if (platform.type === "bounce") {
+                        if (
+                            platform.type === "bounce" &&
+                            !chargingRef.current
+                        ) {
                             player.grounded = false;
-                            player.velocityY = -520;
+                            player.velocityX = incomingVelocityX;
+                            player.velocityY = -incomingBouncePower;
                         }
 
                         break;
@@ -1703,6 +1786,9 @@ function JumpGame() {
 
     const chargeBarPercent =
         chargePercent;
+
+    const doubleJumpChargePercent =
+        Math.round(doubleJumpCharge * 100);
 
     return (
         <article className="jump-game-card">
@@ -1851,7 +1937,7 @@ function JumpGame() {
                     "playing" && (
                         <div className="charge-container">
                             <div className="charge-label">
-                                <span>Hold stage / Space · release</span>
+                                <span>Jump power</span>
                                 <strong>{chargePercent}%</strong>
                             </div>
                             <div
@@ -1904,6 +1990,21 @@ function JumpGame() {
                             >
                                 <div className="charge-fill" style={{ width: `${chargeBarPercent}%` }}><i className="charge-handle" /></div>
                             </div>
+
+                            {doubleJumpCharging && (
+                                <div className="double-jump-meter">
+                                    <div className="charge-label">
+                                        <span>↑ Double jump</span>
+                                        <strong>{doubleJumpChargePercent}%</strong>
+                                    </div>
+                                    <div className="charge-track double-jump-track">
+                                        <div
+                                            className="charge-fill double-jump-fill"
+                                            style={{ width: `${doubleJumpChargePercent}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
             </div>
