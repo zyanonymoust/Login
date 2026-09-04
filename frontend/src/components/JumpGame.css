@@ -231,10 +231,10 @@
 .charge-container {
     position: absolute;
     z-index: 3;
-    top: auto;
-    right: 18px;
-    bottom: 17px;
-    left: auto;
+    top: 17px;
+    right: auto;
+    bottom: auto;
+    left: 18px;
     width: min(235px, 32%);
     box-sizing: border-box;
     margin: 0;
