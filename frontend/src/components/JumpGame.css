@@ -291,6 +291,60 @@
     transition: none;
 }
 
+.jump-game-live-hud {
+    position: absolute;
+    z-index: 3;
+    top: 17px;
+    right: 18px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.17);
+    border-radius: 12px;
+    color: rgba(238, 243, 255, 0.76);
+    background: rgba(11, 16, 52, 0.58);
+    backdrop-filter: blur(10px);
+    font-size: 10px;
+    pointer-events: auto;
+}
+
+.jump-game-live-hud strong { color: #fff4a8; }
+.jump-game-live-hud button {
+    width: 25px;
+    height: 25px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 7px;
+    color: white;
+    background: rgba(128, 98, 255, 0.55);
+    cursor: pointer;
+}
+
+.jump-game-summary { font-size: 12px; }
+
+.jump-game-stats,
+.jump-game-achievements {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.jump-game-stats span,
+.jump-game-achievements span {
+    padding: 5px 9px;
+    border: 1px solid rgba(126, 97, 255, 0.15);
+    border-radius: 999px;
+    color: #817b9c;
+    background: rgba(126, 97, 255, 0.07);
+    font-size: 10px;
+}
+
+.jump-game-stats strong { color: #654dd0; }
+.jump-game-achievements span { color: #9b6b12; background: rgba(255, 211, 80, 0.1); }
+
 .jump-game-instructions {
     display: flex;
     margin-top: 16px;
@@ -415,6 +469,20 @@
         box-shadow: 0 5px 16px rgba(8, 11, 41, 0.13);
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
+    }
+
+    .jump-game-live-hud {
+        top: 8px;
+        right: 8px;
+        gap: 4px;
+        padding: 5px 6px;
+        font-size: 7px;
+    }
+
+    .jump-game-live-hud button {
+        width: 21px;
+        height: 21px;
+        font-size: 9px;
     }
 
     .charge-label {

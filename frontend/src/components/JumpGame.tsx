@@ -9,7 +9,16 @@ import "./JumpGame.css";
 type GameState =
     | "idle"
     | "playing"
+    | "paused"
     | "gameover";
+
+type PlatformType =
+    | "normal"
+    | "moving"
+    | "bounce"
+    | "fragile"
+    | "ice"
+    | "temporary";
 
 interface Player {
     x: number;
@@ -27,6 +36,26 @@ interface Platform {
     y: number;
     width: number;
     height: number;
+    type: PlatformType;
+    originX: number;
+    phase: number;
+    landedAt?: number;
+    broken?: boolean;
+}
+
+interface Collectible {
+    platformId: number;
+    x: number;
+    y: number;
+    collected: boolean;
+}
+
+interface GameStats {
+    jumps: number;
+    centres: number;
+    longestJump: number;
+    bestStreak: number;
+    stars: number;
 }
 
 const GAME_WIDTH = 900;
@@ -35,15 +64,37 @@ const GRAVITY = 1150;
 const MAX_CHARGE_TIME = 1200;
 const MAX_POWER_HOLD_TIME = 1000;
 
+function getPlatformType(id: number): PlatformType {
+    if (id < 5) return "normal";
+    if (id % 17 === 0) return "temporary";
+    if (id % 13 === 0) return "ice";
+    if (id % 11 === 0) return "fragile";
+    if (id % 7 === 0) return "bounce";
+    if (id % 5 === 0) return "moving";
+    return "normal";
+}
+
+function makePlatform(
+    id: number,
+    x: number,
+    y: number,
+    width: number
+): Platform {
+    return {
+        id,
+        x,
+        y,
+        width,
+        height: 24,
+        type: getPlatformType(id),
+        originX: x,
+        phase: Math.random() * Math.PI * 2
+    };
+}
+
 function createStartingPlatforms(): Platform[] {
     const platforms: Platform[] = [
-        {
-            id: 0,
-            x: 50,
-            y: 330,
-            width: 160,
-            height: 24
-        }
+        makePlatform(0, 50, 330, 160)
     ];
 
     for (let index = 1; index < 9; index++) {
@@ -67,16 +118,14 @@ function createStartingPlatforms(): Platform[] {
             )
         );
 
-        platforms.push({
-            id: index,
-            x:
-                previous.x +
-                previous.width +
-                gap,
-            y,
-            width,
-            height: 24
-        });
+        platforms.push(
+            makePlatform(
+                index,
+                previous.x + previous.width + gap,
+                y,
+                width
+            )
+        );
     }
 
     return platforms;
@@ -120,6 +169,16 @@ function JumpGame() {
     const nextPlatformIdRef = useRef(9);
     const scoreRef = useRef(0);
     const centreStreakRef = useRef(0);
+    const statsRef = useRef<GameStats>({
+        jumps: 0,
+        centres: 0,
+        longestJump: 0,
+        bestStreak: 0,
+        stars: 0
+    });
+    const collectiblesRef = useRef<Collectible[]>([]);
+    const ghostRef = useRef<{ x: number; y: number }[]>([]);
+    const ghostRecordingRef = useRef<{ x: number; y: number }[]>([]);
     const bonusTextRef = useRef("");
     const bonusUntilRef = useRef(0);
 
@@ -143,6 +202,9 @@ function JumpGame() {
         });
 
     const [charge, setCharge] = useState(0);
+    const [centreStreak, setCentreStreak] = useState(0);
+    const [stats, setStats] = useState<GameStats>(statsRef.current);
+    const [achievements, setAchievements] = useState<string[]>([]);
 
     const updateGameState = useCallback(
         (nextState: GameState) => {
@@ -159,11 +221,13 @@ function JumpGame() {
         const previous =
             platforms[platforms.length - 1];
 
+        const difficulty = Math.min(1, scoreRef.current / 500);
+
         const gap =
-            105 + Math.random() * 135;
+            105 + difficulty * 35 + Math.random() * 135;
 
         const width =
-            105 + Math.random() * 80;
+            105 - difficulty * 25 + Math.random() * 80;
 
         const heightChange =
             (Math.random() - 0.5) * 95;
@@ -176,16 +240,24 @@ function JumpGame() {
             )
         );
 
-        platforms.push({
-            id: nextPlatformIdRef.current,
-            x:
-                previous.x +
-                previous.width +
-                gap,
+        const id = nextPlatformIdRef.current;
+        const platform = makePlatform(
+            id,
+            previous.x + previous.width + gap,
             y,
-            width,
-            height: 24
-        });
+            width
+        );
+
+        platforms.push(platform);
+
+        if (id > 5 && id % 3 === 0) {
+            collectiblesRef.current.push({
+                platformId: id,
+                x: platform.x + platform.width / 2,
+                y: platform.y - 46,
+                collected: false
+            });
+        }
 
         nextPlatformIdRef.current += 1;
     }, []);
@@ -220,12 +292,31 @@ function JumpGame() {
         nextPlatformIdRef.current = 9;
         scoreRef.current = 0;
         centreStreakRef.current = 0;
+        statsRef.current = {
+            jumps: 0,
+            centres: 0,
+            longestJump: 0,
+            bestStreak: 0,
+            stars: 0
+        };
+        collectiblesRef.current = [];
+        ghostRecordingRef.current = [];
+        try {
+            ghostRef.current = JSON.parse(
+                localStorage.getItem("jump-game-ghost") ?? "[]"
+            ) as { x: number; y: number }[];
+        } catch {
+            ghostRef.current = [];
+        }
         bonusTextRef.current = "";
         bonusUntilRef.current = 0;
         previousTimeRef.current = null;
 
         setScore(0);
         setCharge(0);
+        setCentreStreak(0);
+        setStats(statsRef.current);
+        setAchievements([]);
         updateGameState("playing");
     }, [updateGameState]);
 
@@ -277,8 +368,16 @@ function JumpGame() {
         }
 
         const player = playerRef.current;
+        const currentPlatform = platformsRef.current.find(
+            (platform) => platform.id === currentPlatformRef.current
+        );
         const effectivePower =
-            Math.pow(finalCharge, 1.15);
+            Math.pow(finalCharge, 1.15) *
+            (currentPlatform?.type === "ice" ? 1.15 : 1);
+
+        if (currentPlatform?.type === "fragile") {
+            currentPlatform.broken = true;
+        }
 
         player.grounded = false;
 
@@ -287,6 +386,12 @@ function JumpGame() {
 
         player.velocityY =
             -(effectivePower * 840);
+
+        statsRef.current = {
+            ...statsRef.current,
+            jumps: statsRef.current.jumps + 1
+        };
+        setStats(statsRef.current);
     }, []);
 
     const finishGame = useCallback(() => {
@@ -303,6 +408,13 @@ function JumpGame() {
         setCharge(0);
 
         const finalScore = scoreRef.current;
+
+        if (ghostRecordingRef.current.length > 0) {
+            localStorage.setItem(
+                "jump-game-ghost",
+                JSON.stringify(ghostRecordingRef.current.slice(-600))
+            );
+        }
 
         setHighScore((previous) => {
             const nextHighScore =
@@ -322,10 +434,27 @@ function JumpGame() {
         updateGameState("gameover");
     }, [updateGameState]);
 
+    const togglePause = useCallback(() => {
+        if (gameStateRef.current === "playing") {
+            chargingRef.current = false;
+            manualChargingRef.current = false;
+            updateGameState("paused");
+        } else if (gameStateRef.current === "paused") {
+            previousTimeRef.current = null;
+            updateGameState("playing");
+        }
+    }, [updateGameState]);
+
     useEffect(() => {
         function handleKeyDown(
             event: KeyboardEvent
         ) {
+            if (event.code === "KeyP" || event.code === "Escape") {
+                event.preventDefault();
+                togglePause();
+                return;
+            }
+
             if (event.code !== "Space") {
                 return;
             }
@@ -409,6 +538,7 @@ function JumpGame() {
         beginCharge,
         releaseCharge,
         resetGame,
+        togglePause,
     ]);
 
     useEffect(() => {
@@ -467,6 +597,13 @@ function JumpGame() {
         function drawBackground(
             animationTime: number
         ) {
+            const scene = Math.floor(scoreRef.current / 100) % 3;
+            const palettes = [
+                ["#111b42", "#17245b", "#301d64"],
+                ["#291449", "#77365f", "#ef8a62"],
+                ["#07162f", "#12375a", "#087f8c"]
+            ];
+            const palette = palettes[scene];
             const gradient =
                 context!.createLinearGradient(
                     0,
@@ -477,17 +614,17 @@ function JumpGame() {
 
             gradient.addColorStop(
                 0,
-                "#111b42"
+                palette[0]
             );
 
             gradient.addColorStop(
                 0.5,
-                "#17245b"
+                palette[1]
             );
 
             gradient.addColorStop(
                 1,
-                "#301d64"
+                palette[2]
             );
 
             context!.fillStyle = gradient;
@@ -630,6 +767,7 @@ function JumpGame() {
                 const platform of
                 platformsRef.current
             ) {
+                if (platform.broken) continue;
                 const screenX =
                     platform.x - cameraX;
 
@@ -643,8 +781,17 @@ function JumpGame() {
                     continue;
                 }
 
-                context!.shadowColor =
-                    "rgba(92, 239, 255, 0.38)";
+                const platformColours: Record<PlatformType, [string, string, string]> = {
+                    normal: ["#67f4ff", "#28c9e8", "#1768b4"],
+                    moving: ["#ffe477", "#f5a623", "#be6712"],
+                    bounce: ["#91ffb8", "#31d77d", "#158c58"],
+                    fragile: ["#ffb0bd", "#f06378", "#a9294c"],
+                    ice: ["#e8fbff", "#88dffa", "#478dc4"],
+                    temporary: ["#d8b6ff", "#9f70ed", "#6740aa"]
+                };
+                const colours = platformColours[platform.type];
+
+                context!.shadowColor = colours[1];
 
                 context!.shadowBlur = 16;
 
@@ -659,17 +806,17 @@ function JumpGame() {
 
                 topGradient.addColorStop(
                     0,
-                    "#67f4ff"
+                    colours[0]
                 );
 
                 topGradient.addColorStop(
                     0.18,
-                    "#28c9e8"
+                    colours[1]
                 );
 
                 topGradient.addColorStop(
                     1,
-                    "#1768b4"
+                    colours[2]
                 );
 
                 drawRoundedRectangle(
@@ -684,6 +831,17 @@ function JumpGame() {
                     topGradient;
 
                 context!.fill();
+
+                const targetWidth = Math.min(34, platform.width * 0.28);
+                context!.fillStyle = "rgba(255,255,255,0.8)";
+                context!.shadowColor = "#ffffff";
+                context!.shadowBlur = 12;
+                context!.fillRect(
+                    screenX + platform.width / 2 - targetWidth / 2,
+                    platform.y + 2,
+                    targetWidth,
+                    4
+                );
 
                 context!.shadowBlur = 0;
 
@@ -742,6 +900,43 @@ function JumpGame() {
             }
         }
 
+        function drawCollectibles() {
+            for (const star of collectiblesRef.current) {
+                if (star.collected) continue;
+                const screenX = star.x - cameraXRef.current;
+                context!.save();
+                context!.translate(screenX, star.y);
+                context!.rotate(performance.now() / 700);
+                context!.fillStyle = "#ffe66d";
+                context!.shadowColor = "#ffd23f";
+                context!.shadowBlur = 14;
+                context!.font = "700 22px sans-serif";
+                context!.textAlign = "center";
+                context!.fillText("★", 0, 7);
+                context!.restore();
+            }
+        }
+
+        function drawGhost() {
+            const point = ghostRef.current[
+                Math.min(
+                    ghostRef.current.length - 1,
+                    ghostRecordingRef.current.length
+                )
+            ];
+            if (!point) return;
+            context!.save();
+            context!.globalAlpha = 0.22;
+            context!.fillStyle = "#ffffff";
+            context!.fillRect(
+                point.x - cameraXRef.current,
+                point.y,
+                playerRef.current.width,
+                playerRef.current.height
+            );
+            context!.restore();
+        }
+
         function drawPlayer() {
             const player =
                 playerRef.current;
@@ -796,19 +991,25 @@ function JumpGame() {
                     displayedHeight
                 );
 
+            const playerPalette = scoreRef.current >= 300
+                ? ["#fff09b", "#ff9d3d", "#e34b68"]
+                : scoreRef.current >= 150
+                    ? ["#b7ffdc", "#36d6a0", "#168b83"]
+                    : ["#bca7ff", "#8062ff", "#4d38c8"];
+
             playerGradient.addColorStop(
                 0,
-                "#bca7ff"
+                playerPalette[0]
             );
 
             playerGradient.addColorStop(
                 0.5,
-                "#8062ff"
+                playerPalette[1]
             );
 
             playerGradient.addColorStop(
                 1,
-                "#4d38c8"
+                playerPalette[2]
             );
 
             drawRoundedRectangle(
@@ -940,6 +1141,35 @@ function JumpGame() {
             const player =
                 playerRef.current;
 
+            for (const platform of platformsRef.current) {
+                if (platform.type === "moving" && !platform.broken) {
+                    const previousX = platform.x;
+                    platform.x =
+                        platform.originX +
+                        Math.sin(animationTime / 900 + platform.phase) * 38;
+                    if (
+                        player.grounded &&
+                        platform.id === currentPlatformRef.current
+                    ) {
+                        player.x += platform.x - previousX;
+                    }
+                }
+                if (
+                    platform.type === "temporary" &&
+                    platform.landedAt !== undefined &&
+                    animationTime - platform.landedAt > 1500
+                ) {
+                    platform.broken = true;
+                    if (
+                        player.grounded &&
+                        platform.id === currentPlatformRef.current
+                    ) {
+                        player.grounded = false;
+                        player.velocityY = 40;
+                    }
+                }
+            }
+
             if (
                 chargingRef.current &&
                 player.grounded &&
@@ -977,6 +1207,29 @@ function JumpGame() {
                     player.velocityY *
                     deltaTime;
 
+                if (ghostRecordingRef.current.length < 600) {
+                    ghostRecordingRef.current.push({ x: player.x, y: player.y });
+                }
+
+                for (const star of collectiblesRef.current) {
+                    if (
+                        !star.collected &&
+                        Math.abs(player.x + player.width / 2 - star.x) < 24 &&
+                        Math.abs(player.y + player.height / 2 - star.y) < 28
+                    ) {
+                        star.collected = true;
+                        scoreRef.current += 5;
+                        statsRef.current = {
+                            ...statsRef.current,
+                            stars: statsRef.current.stars + 1
+                        };
+                        setScore(scoreRef.current);
+                        setStats(statsRef.current);
+                        bonusTextRef.current = "STAR +5";
+                        bonusUntilRef.current = animationTime + 850;
+                    }
+                }
+
                 const currentBottom =
                     player.y +
                     player.height;
@@ -986,6 +1239,7 @@ function JumpGame() {
                         const platform of
                         platformsRef.current
                     ) {
+                        if (platform.broken) continue;
                         const overlapLeft =
                             Math.max(
                                 player.x,
@@ -1032,6 +1286,10 @@ function JumpGame() {
                         player.velocityY = 0;
                         player.grounded = true;
 
+                        if (platform.type === "temporary") {
+                            platform.landedAt = animationTime;
+                        }
+
                         if (
                             platform.id >
                             currentPlatformRef.current
@@ -1066,6 +1324,10 @@ function JumpGame() {
                                 centreDistance <=
                                 16;
 
+                            const good =
+                                !perfect &&
+                                centreDistance <= platform.width * 0.28;
+
                             const distanceMultiplier =
                                 2 ** skippedPlatforms;
 
@@ -1076,9 +1338,13 @@ function JumpGame() {
                                 distanceMultiplier *
                                 centreMultiplier;
 
+                            const previousCentreStreak =
+                                centreStreakRef.current;
+
                             centreStreakRef.current = perfect
                                 ? centreStreakRef.current + 1
                                 : 0;
+                            setCentreStreak(centreStreakRef.current);
 
                             const centreComboMultiplier = perfect
                                 ? 2 ** (centreStreakRef.current - 1)
@@ -1088,21 +1354,58 @@ function JumpGame() {
                                 baseScore *
                                 centreComboMultiplier;
 
-                            scoreRef.current +=
-                                addedScore;
+                            const previousScore = scoreRef.current;
+                            scoreRef.current += addedScore;
+
+                            const crossedMilestone =
+                                Math.floor(scoreRef.current / 100) >
+                                Math.floor(previousScore / 100);
+                            if (crossedMilestone) {
+                                scoreRef.current += 25;
+                            }
+
+                            statsRef.current = {
+                                ...statsRef.current,
+                                centres:
+                                    statsRef.current.centres +
+                                    (perfect ? 1 : 0),
+                                longestJump: Math.max(
+                                    statsRef.current.longestJump,
+                                    platformDistance
+                                ),
+                                bestStreak: Math.max(
+                                    statsRef.current.bestStreak,
+                                    centreStreakRef.current
+                                )
+                            };
+                            setStats(statsRef.current);
+
+                            const unlocked = [
+                                scoreRef.current >= 100 ? "百点高手" : "",
+                                statsRef.current.bestStreak >= 5 ? "中心大师" : "",
+                                statsRef.current.longestJump >= 4 ? "飞跃专家" : "",
+                                statsRef.current.stars >= 10 ? "星星猎人" : ""
+                            ].filter(Boolean);
+                            setAchievements(unlocked);
 
                             setScore(
                                 scoreRef.current
                             );
 
                             bonusTextRef.current =
-                                perfect
+                                crossedMilestone
+                                    ? `MILESTONE +25 · +${addedScore}`
+                                    : perfect
                                     ? centreStreakRef.current > 1
                                         ? `CENTER COMBO x${centreComboMultiplier} +${addedScore}`
                                         : `CENTER +${addedScore}`
+                                    : previousCentreStreak > 0
+                                        ? `COMBO LOST · ${good ? "GOOD" : "EDGE"} +${addedScore}`
+                                        : good
+                                            ? `GOOD +${addedScore}`
                                     : skippedPlatforms > 0
                                         ? `SKIP +${addedScore}`
-                                        : "+1";
+                                        : `EDGE +${addedScore}`;
 
                             bonusUntilRef.current =
                                 animationTime +
@@ -1118,6 +1421,12 @@ function JumpGame() {
                             }
                         } else {
                             centreStreakRef.current = 0;
+                            setCentreStreak(0);
+                        }
+
+                        if (platform.type === "bounce") {
+                            player.grounded = false;
+                            player.velocityY = -520;
                         }
 
                         break;
@@ -1180,6 +1489,8 @@ function JumpGame() {
 
             drawBackground(animationTime);
             drawPlatforms();
+            drawCollectibles();
+            drawGhost();
             drawPlayer();
             drawBonus(animationTime);
 
@@ -1309,6 +1620,10 @@ function JumpGame() {
                                 Best score: {highScore}
                             </p>
 
+                            <p className="jump-game-summary">
+                                {stats.jumps} jumps · {stats.centres} centres · best combo {stats.bestStreak}
+                            </p>
+
                             <button
                                 type="button"
                                 onPointerDown={(event) => event.stopPropagation()}
@@ -1318,6 +1633,42 @@ function JumpGame() {
                             </button>
                         </div>
                     )}
+
+                {gameState === "paused" && (
+                    <div className="jump-game-overlay">
+                        <span className="jump-game-overlay-label">Paused</span>
+                        <h4>Take a break</h4>
+                        <button
+                            type="button"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={togglePause}
+                        >
+                            Resume
+                        </button>
+                    </div>
+                )}
+
+                {(gameState === "playing" || gameState === "paused") && (
+                    <div className="jump-game-live-hud">
+                        <span>Combo <strong>{centreStreak}</strong></span>
+                        <span>Next <strong>x{2 ** centreStreak}</strong></span>
+                        <span>Stars <strong>{stats.stars}</strong></span>
+                        <button
+                            type="button"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={togglePause}
+                        >
+                            {gameState === "paused" ? "▶" : "Ⅱ"}
+                        </button>
+                        <button
+                            type="button"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={resetGame}
+                        >
+                            ↻
+                        </button>
+                    </div>
+                )}
 
                 {gameState ===
                     "playing" && (
@@ -1391,6 +1742,21 @@ function JumpGame() {
                     🎯 Consecutive centres double
                 </span>
             </div>
+
+            <div className="jump-game-stats">
+                <span>Jumps <strong>{stats.jumps}</strong></span>
+                <span>Centre rate <strong>{stats.jumps > 0 ? Math.round(stats.centres / stats.jumps * 100) : 0}%</strong></span>
+                <span>Longest <strong>{stats.longestJump}</strong></span>
+                <span>Best combo <strong>{stats.bestStreak}</strong></span>
+            </div>
+
+            {achievements.length > 0 && (
+                <div className="jump-game-achievements">
+                    {achievements.map((achievement) => (
+                        <span key={achievement}>🏆 {achievement}</span>
+                    ))}
+                </div>
+            )}
         </article>
     );
 }
