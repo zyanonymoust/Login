@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type SubmitEvent } from "react";
 import {
     Link,
     useNavigate,
@@ -24,7 +24,7 @@ function Login() {
         searchParams.get("registered") === "true";
 
     async function handleSubmit(
-        event: FormEvent<HTMLFormElement>
+        event: SubmitEvent<HTMLFormElement>
     ) {
         event.preventDefault();
         setError("");

@@ -119,6 +119,7 @@ function JumpGame() {
     const currentPlatformRef = useRef(0);
     const nextPlatformIdRef = useRef(9);
     const scoreRef = useRef(0);
+    const centreStreakRef = useRef(0);
     const bonusTextRef = useRef("");
     const bonusUntilRef = useRef(0);
 
@@ -218,6 +219,7 @@ function JumpGame() {
         currentPlatformRef.current = 0;
         nextPlatformIdRef.current = 9;
         scoreRef.current = 0;
+        centreStreakRef.current = 0;
         bonusTextRef.current = "";
         bonusUntilRef.current = 0;
         previousTimeRef.current = null;
@@ -1007,7 +1009,7 @@ function JumpGame() {
 
                         const horizontalHit =
                             horizontalOverlap >=
-                            player.width * (2 / 3);
+                            player.width / 3;
 
                         const verticalHit =
                             previousBottom <=
@@ -1070,9 +1072,21 @@ function JumpGame() {
                             const centreMultiplier =
                                 perfect ? 3 : 1;
 
-                            const addedScore =
+                            const baseScore =
                                 distanceMultiplier *
                                 centreMultiplier;
+
+                            centreStreakRef.current = perfect
+                                ? centreStreakRef.current + 1
+                                : 0;
+
+                            const centreComboMultiplier = perfect
+                                ? 2 ** (centreStreakRef.current - 1)
+                                : 1;
+
+                            const addedScore =
+                                baseScore *
+                                centreComboMultiplier;
 
                             scoreRef.current +=
                                 addedScore;
@@ -1083,7 +1097,9 @@ function JumpGame() {
 
                             bonusTextRef.current =
                                 perfect
-                                    ? `CENTER +${addedScore}`
+                                    ? centreStreakRef.current > 1
+                                        ? `CENTER COMBO x${centreComboMultiplier} +${addedScore}`
+                                        : `CENTER +${addedScore}`
                                     : skippedPlatforms > 0
                                         ? `SKIP +${addedScore}`
                                         : "+1";
@@ -1100,6 +1116,8 @@ function JumpGame() {
                             ) {
                                 addPlatform();
                             }
+                        } else {
+                            centreStreakRef.current = 0;
                         }
 
                         break;
@@ -1370,7 +1388,7 @@ function JumpGame() {
                 </span>
 
                 <span>
-                    🎯 Centre landing +3
+                    🎯 Consecutive centres double
                 </span>
             </div>
         </article>
